@@ -30,10 +30,10 @@ final class ChapterRail extends BorderPane {
         setStyle("-fx-background-color: #132b45;");
 
         VBox identity = new VBox(2);
-        Label mark = new Label("K");
+        Label mark = new Label("P");
         mark.setTextFill(Color.web("#d8f45a"));
         mark.setFont(Font.font("Georgia", FontWeight.BOLD, 31));
-        Label name = new Label("KINETIK");
+        Label name = new Label("PHYSORA");
         name.setTextFill(Color.web("#f5f0e4"));
         name.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
         Label tagline = new Label("PHYSICS, IN MOTION");

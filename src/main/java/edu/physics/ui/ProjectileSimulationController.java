@@ -14,6 +14,7 @@ import java.util.OptionalDouble;
 /** Shares one analytical model and one simulation clock between all bench views. */
 final class ProjectileSimulationController {
     static final double OPEN_ENDED_DURATION = 8.0;
+    private static final double MAX_FRAME_DELTA_SECONDS = 0.1;
 
     private final DoubleProperty launchSpeed = new SimpleDoubleProperty(20.0);
     private final DoubleProperty launchAngle = new SimpleDoubleProperty(45.0);
@@ -31,16 +32,9 @@ final class ProjectileSimulationController {
                 previousFrameNanos = now;
                 return;
             }
-            double elapsedSeconds = Math.min(0.1, (now - previousFrameNanos) / 1_000_000_000.0);
+            double elapsedSeconds = Math.max(0.0, (now - previousFrameNanos) / 1_000_000_000.0);
             previousFrameNanos = now;
-            double nextTime = simulationTime.get() + elapsedSeconds * playbackSpeed.get();
-            OptionalDouble flightTime = model.get().timeOfFlight();
-            if (flightTime.isPresent() && nextTime >= flightTime.getAsDouble()) {
-                simulationTime.set(flightTime.getAsDouble());
-                pause();
-            } else {
-                simulationTime.set(nextTime);
-            }
+            advanceByElapsedSeconds(elapsedSeconds);
         }
     };
 
@@ -80,6 +74,22 @@ final class ProjectileSimulationController {
     void reset() {
         pause();
         simulationTime.set(0.0);
+    }
+
+    /** Advances display time only; the analytical model remains the source of physical state. */
+    void advanceByElapsedSeconds(double elapsedSeconds) {
+        if (!Double.isFinite(elapsedSeconds) || elapsedSeconds < 0.0) {
+            throw new IllegalArgumentException("Elapsed time must be finite and non-negative");
+        }
+        double boundedElapsed = Math.min(MAX_FRAME_DELTA_SECONDS, elapsedSeconds);
+        double nextTime = simulationTime.get() + boundedElapsed * playbackSpeed.get();
+        OptionalDouble flightTime = model.get().timeOfFlight();
+        if (flightTime.isPresent() && nextTime >= flightTime.getAsDouble()) {
+            simulationTime.set(flightTime.getAsDouble());
+            pause();
+        } else {
+            simulationTime.set(nextTime);
+        }
     }
 
     void seek(double time) {

@@ -1,4 +1,4 @@
-# OOP Physics Learning Environment — Project Goal
+# PHYSORA — Project Goal
 
 ## 1. Primary Objective
 
@@ -98,7 +98,7 @@ Report build verification, test results, runtime verification, visual review, an
 
 ## 7. Product Identity Direction
 
-**KINETIK — Physics, in motion** is the current working concept for the visual identity, not a finalized product name.
+**PHYSORA — Physics, in motion** is the confirmed project name and current visual identity.
 
 The intended direction is an experimental, editorial, interactive physics laboratory: expressive typography and composition, precise scientific diagrams, trajectory and vector graphics, deliberate negative space, and purposeful accent colors. The chapter introduction may be expressive; the working simulator should remain clear and precise.
 

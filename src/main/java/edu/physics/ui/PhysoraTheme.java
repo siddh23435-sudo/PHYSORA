@@ -2,7 +2,7 @@ package edu.physics.ui;
 
 import javafx.scene.paint.Color;
 
-final class KinetikTheme {
+final class PhysoraTheme {
     static final Color PAPER = Color.web("#f5f1e5");
     static final Color PAPER_SHADE = Color.web("#e9e2d0");
     static final Color INK = Color.web("#142e4b");
@@ -14,5 +14,5 @@ final class KinetikTheme {
     static final Color CANVAS = Color.web("#f0eddf");
     static final Color GRID = Color.web("#d9d4c5");
 
-    private KinetikTheme() {}
+    private PhysoraTheme() {}
 }

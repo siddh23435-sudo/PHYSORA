@@ -14,6 +14,10 @@ final class ProjectileCanvasRenderer {
     private static final int PATH_SAMPLES = 120;
     private final Canvas canvas = new Canvas(800, 520);
     private boolean showVelocityComponents = true;
+    private ProjectileMotion sampledModel;
+    private double sampledEndTime = Double.NaN;
+    private double[] sampledX = new double[0];
+    private double[] sampledY = new double[0];
 
     Canvas canvas() {
         return canvas;
@@ -31,25 +35,25 @@ final class ProjectileCanvasRenderer {
         }
 
         GraphicsContext gc = canvas.getGraphicsContext2D();
-        gc.setFill(KinetikTheme.CANVAS);
+        gc.setFill(PhysoraTheme.CANVAS);
         gc.fillRect(0, 0, width, height);
 
         OptionalDouble flightTime = model.timeOfFlight();
         double endTime = flightTime.isPresent()
                 ? Math.max(0.0, flightTime.getAsDouble())
                 : Math.max(openDuration, time);
-        ProjectileMotion.State[] path = samplePath(model, endTime);
+        samplePathIfNeeded(model, endTime);
         ProjectileMotion.State current = model.stateAt(time);
 
         double minX = 0.0;
         double maxX = 0.0;
         double minY = 0.0;
         double maxY = 0.0;
-        for (ProjectileMotion.State point : path) {
-            minX = Math.min(minX, point.x());
-            maxX = Math.max(maxX, point.x());
-            minY = Math.min(minY, point.y());
-            maxY = Math.max(maxY, point.y());
+        for (int i = 0; i < sampledX.length; i++) {
+            minX = Math.min(minX, sampledX[i]);
+            maxX = Math.max(maxX, sampledX[i]);
+            minY = Math.min(minY, sampledY[i]);
+            maxY = Math.max(maxY, sampledY[i]);
         }
         minX = Math.min(minX, current.x());
         maxX = Math.max(maxX, current.x());
@@ -70,24 +74,29 @@ final class ProjectileCanvasRenderer {
 
         drawGrid(gc, left, right, top, bottom);
         drawAxes(gc, left, right, top, bottom, originX, groundScreenY, minX, maxX, minY, maxY, scale);
-        drawTrajectory(gc, path, originX, groundScreenY, scale);
+        drawTrajectory(gc, originX, groundScreenY, scale);
         drawProjectile(gc, current, originX, groundScreenY, scale);
         if (showVelocityComponents) {
             drawVelocityComponents(gc, current, originX, groundScreenY, scale);
         }
     }
 
-    private static ProjectileMotion.State[] samplePath(ProjectileMotion model, double endTime) {
-        ProjectileMotion.State[] points = new ProjectileMotion.State[PATH_SAMPLES + 1];
+    private void samplePathIfNeeded(ProjectileMotion model, double endTime) {
+        if (model == sampledModel && Double.compare(endTime, sampledEndTime) == 0) return;
+        sampledX = new double[PATH_SAMPLES + 1];
+        sampledY = new double[PATH_SAMPLES + 1];
         for (int i = 0; i <= PATH_SAMPLES; i++) {
-            points[i] = model.stateAt(endTime * i / PATH_SAMPLES);
+            ProjectileMotion.State point = model.stateAt(endTime * i / PATH_SAMPLES);
+            sampledX[i] = point.x();
+            sampledY[i] = point.y();
         }
-        return points;
+        sampledModel = model;
+        sampledEndTime = endTime;
     }
 
     private static void drawGrid(GraphicsContext gc, double left, double right,
                                   double top, double bottom) {
-        gc.setStroke(KinetikTheme.GRID);
+        gc.setStroke(PhysoraTheme.GRID);
         gc.setLineWidth(0.8);
         for (int i = 0; i <= 8; i++) {
             double x = left + (right - left) * i / 8.0;
@@ -103,11 +112,11 @@ final class ProjectileCanvasRenderer {
                                  double top, double bottom, double originX,
                                  double groundY, double minX, double maxX,
                                  double minY, double maxY, double scale) {
-        gc.setStroke(KinetikTheme.INK);
+        gc.setStroke(PhysoraTheme.INK);
         gc.setLineWidth(1.25);
         gc.strokeLine(left, groundY, right, groundY);
         gc.strokeLine(originX, top, originX, bottom);
-        gc.setFill(KinetikTheme.MUTED);
+        gc.setFill(PhysoraTheme.MUTED);
         gc.setFont(Font.font("Consolas", 10));
         gc.fillText("x / m", right - 32, Math.min(bottom - 5, groundY + 24));
         gc.fillText("y / m", originX + 7, top + 11);
@@ -124,19 +133,18 @@ final class ProjectileCanvasRenderer {
             gc.strokeLine(originX - 3, screenY, originX + 3, screenY);
             gc.fillText(String.format(Locale.ROOT, "%.1f", y), originX - 34, screenY + 3);
         }
-        gc.setFill(KinetikTheme.MUTED);
+        gc.setFill(PhysoraTheme.MUTED);
         gc.setFont(Font.font("Segoe UI", 10));
         gc.fillText("GROUND  /  y = 0", left + 8, Math.max(top + 15, groundY - 9));
     }
 
-    private static void drawTrajectory(GraphicsContext gc, ProjectileMotion.State[] path,
-                                       double originX, double groundY, double scale) {
-        gc.setStroke(KinetikTheme.COBALT);
+    private void drawTrajectory(GraphicsContext gc, double originX, double groundY, double scale) {
+        gc.setStroke(PhysoraTheme.COBALT);
         gc.setLineWidth(2.4);
         gc.beginPath();
-        gc.moveTo(originX + path[0].x() * scale, groundY - path[0].y() * scale);
-        for (int i = 1; i < path.length; i++) {
-            gc.lineTo(originX + path[i].x() * scale, groundY - path[i].y() * scale);
+        gc.moveTo(originX + sampledX[0] * scale, groundY - sampledY[0] * scale);
+        for (int i = 1; i < sampledX.length; i++) {
+            gc.lineTo(originX + sampledX[i] * scale, groundY - sampledY[i] * scale);
         }
         gc.stroke();
     }
@@ -145,12 +153,12 @@ final class ProjectileCanvasRenderer {
                                        double originX, double groundY, double scale) {
         double x = originX + state.x() * scale;
         double y = groundY - state.y() * scale;
-        gc.setFill(KinetikTheme.ORANGE);
+        gc.setFill(PhysoraTheme.ORANGE);
         gc.fillOval(x - 6.5, y - 6.5, 13, 13);
-        gc.setStroke(KinetikTheme.PAPER);
+        gc.setStroke(PhysoraTheme.PAPER);
         gc.setLineWidth(1.5);
         gc.strokeOval(x - 6.5, y - 6.5, 13, 13);
-        gc.setFill(KinetikTheme.INK);
+        gc.setFill(PhysoraTheme.INK);
         gc.setFont(Font.font("Consolas", 10));
         gc.fillText(String.format(Locale.ROOT, "(%.2f, %.2f) m", state.x(), state.y()), x + 11, y - 10);
     }
@@ -164,13 +172,13 @@ final class ProjectileCanvasRenderer {
         double vxLength = state.vx() * velocityScale;
         double vyLength = state.vy() * velocityScale;
         gc.setLineWidth(2.1);
-        drawArrow(gc, x, y, x + vxLength, y, KinetikTheme.COBALT);
-        drawArrow(gc, x + vxLength, y, x + vxLength, y - vyLength, KinetikTheme.ORANGE);
+        drawArrow(gc, x, y, x + vxLength, y, PhysoraTheme.COBALT);
+        drawArrow(gc, x + vxLength, y, x + vxLength, y - vyLength, PhysoraTheme.ORANGE);
         gc.setFont(Font.font("Consolas", 10));
-        gc.setFill(KinetikTheme.COBALT);
+        gc.setFill(PhysoraTheme.COBALT);
         gc.fillText(String.format(Locale.ROOT, "vx %.2f m/s", state.vx()),
                 x + vxLength + 6, y + 15);
-        gc.setFill(KinetikTheme.ORANGE);
+        gc.setFill(PhysoraTheme.ORANGE);
         gc.fillText(String.format(Locale.ROOT, "vy %.2f m/s", state.vy()),
                 x + vxLength + 6, y - vyLength - 7);
     }

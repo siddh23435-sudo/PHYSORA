@@ -7,13 +7,13 @@ import javafx.stage.Stage;
 public final class ProjectileSimulatorApp extends Application {
     @Override
     public void start(Stage stage) {
-        KinetikApplicationShell shell = new KinetikApplicationShell();
+        PhysoraApplicationShell shell = new PhysoraApplicationShell();
         Scene scene = new Scene(shell, 1440, 810);
-        var stylesheet = getClass().getResource("/edu/physics/ui/kinetik.css");
+        var stylesheet = getClass().getResource("/edu/physics/ui/physora.css");
         if (stylesheet != null) {
             scene.getStylesheets().add(stylesheet.toExternalForm());
         }
-        stage.setTitle("KINETIK — Physics, in motion");
+        stage.setTitle("PHYSORA — Physics, in motion");
         stage.setMinWidth(1120);
         stage.setMinHeight(700);
         stage.setScene(scene);

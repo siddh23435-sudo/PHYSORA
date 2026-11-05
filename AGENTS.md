@@ -6,7 +6,9 @@ This repository contains a Java-based interactive physics learning, modeling, an
 
 The platform is intended to help students construct physical models, understand governing equations, execute simulations, inspect results, and learn physics through experimentation.
 
-Read `docs/PROJECT_CONTEXT.md` for the physics scope and long-term architecture. Read `docs/PROJECT_GOAL.md` before major product or UI decisions; it defines the academic evaluation bar, quality standards, and working KINETIK design direction.
+Read `docs/PROJECT_CONTEXT.md` for the physics scope and long-term architecture. Read `docs/PROJECT_GOAL.md` before major product or UI decisions; it defines the academic evaluation bar, quality standards, and PHYSORA product direction.
+
+The active milestone is PHYSORA Phase 1: a complete, functional projectile-motion application foundation, not a calculations-only demo. A green build alone does not establish milestone completion. Every advertised feature must be connected to the application and verified against normal, boundary, invalid, ambiguous, and numerically difficult cases where applicable. Keep the requirement-to-test status in `docs/PHASE1_TRACEABILITY.md` current; label partial and unverified work honestly.
 
 ## 2. Mandatory Requirements
 
@@ -140,6 +142,8 @@ Report:
 - Tests not executed
 - Remaining known issues
 
+For milestone work, map each implemented requirement to one or more meaningful tests. Include application/runtime checks for UI behavior where feasible; unit tests of the domain model do not prove the JavaFX application works.
+
 ## 9. Agent Communication
 
 When a task is ambiguous:
@@ -218,6 +222,8 @@ At the end of each task, report:
 8. Recommended next task
 
 Do not claim completion if the acceptance criteria have not been met.
+
+For Phase 1 reports, distinguish build/test success from application launch and visual interaction checks, and identify requirements that are partial or not implemented.
 
 ## 13. Priority Order
 

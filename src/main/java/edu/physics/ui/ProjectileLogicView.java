@@ -1,6 +1,11 @@
 package edu.physics.ui;
 
 import edu.physics.projectile.ProjectileMotion;
+import edu.physics.problem.PhysicalQuantity;
+import edu.physics.problem.PhysicalUnit;
+import edu.physics.problem.ProjectileProblem;
+import edu.physics.problem.ProjectileProblemSolver;
+import edu.physics.problem.ProjectileSolution;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
@@ -12,14 +17,14 @@ import javafx.scene.layout.VBox;
 
 import java.util.Locale;
 import java.util.OptionalDouble;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.EnumMap;
 
 /** Live equation and assumption inspector for the same projectile model. */
 final class ProjectileLogicView extends BorderPane {
     private final ProjectileSimulationController controller;
     private final VBox content = new VBox(4);
-    private final List<Label> equationValues = new ArrayList<>();
+    private final VBox derivation = new VBox(6);
+    private final ProjectileProblemSolver solver = new ProjectileProblemSolver();
     private final Label parameterValues = new Label();
     private final Label currentStateValue = new Label();
     private final Label maximumHeightValue = new Label();
@@ -41,17 +46,8 @@ final class ProjectileLogicView extends BorderPane {
         content.getChildren().addAll(
                 assumptionBlock(),
                 parameterLine(),
-                sectionTitle("INITIAL VELOCITY COMPONENTS"),
-                equationRow("vx0 = v0 cos(theta)"),
-                equationRow("vy0 = v0 sin(theta)"),
-                horizontalRule(),
-                sectionTitle("POSITION AS A FUNCTION OF TIME"),
-                equationRow("x(t) = x0 + vx0 * t"),
-                equationRow("y(t) = y0 + vy0 * t - 0.5 * g * t^2"),
-                horizontalRule(),
-                sectionTitle("VELOCITY AS A FUNCTION OF TIME"),
-                equationRow("vx(t) = vx0"),
-                equationRow("vy(t) = vy0 - g * t"),
+                sectionTitle("MODEL DERIVATION"),
+                derivation,
                 horizontalRule(),
                 sectionTitle("CURRENT STATE"),
                 currentState(),
@@ -76,12 +72,11 @@ final class ProjectileLogicView extends BorderPane {
         return block;
     }
 
-    private HBox equationRow(String equation) {
+    private HBox equationRow(String equation, String evaluatedText) {
         Label formula = new Label(equation);
         formula.getStyleClass().add("equation-text");
-        Label evaluated = new Label();
+        Label evaluated = new Label(evaluatedText);
         evaluated.getStyleClass().add("equation-result");
-        equationValues.add(evaluated);
         HBox row = new HBox(15, formula, spacer(), evaluated);
         row.setPadding(new Insets(1, 0, 1, 0));
         HBox.setHgrow(formula, Priority.ALWAYS);
@@ -113,17 +108,27 @@ final class ProjectileLogicView extends BorderPane {
         double angle = controller.launchAngleProperty().get();
         double gravity = controller.gravityProperty().get();
         double time = controller.simulationTimeProperty().get();
-        ProjectileMotion.State initial = model.stateAt(0.0);
         ProjectileMotion.State state = model.stateAt(time);
         parameterValues.setText(String.format(Locale.ROOT,
                 "v0 %.2f m/s    theta %.2f deg    g %.2f m/s^2", speed, angle, gravity));
 
-        updateEquation(0, String.format(Locale.ROOT, "%.2f * cos(%.2f deg) = %.2f m/s", speed, angle, initial.vx()));
-        updateEquation(1, String.format(Locale.ROOT, "%.2f * sin(%.2f deg) = %.2f m/s", speed, angle, initial.vy()));
-        updateEquation(2, String.format(Locale.ROOT, "x(t) = %.2f + %.2f * t m", 0.0, initial.vx()));
-        updateEquation(3, String.format(Locale.ROOT, "y(t) = %.2f + %.2f * t - %.3f * t^2 m", 0.0, initial.vy(), 0.5 * gravity));
-        updateEquation(4, String.format(Locale.ROOT, "vx(t) = %.2f m/s", initial.vx()));
-        updateEquation(5, String.format(Locale.ROOT, "vy(t) = %.2f - %.2f * t m/s", initial.vy(), gravity));
+        EnumMap<ProjectileProblem.Input, PhysicalQuantity> givens = new EnumMap<>(ProjectileProblem.Input.class);
+        givens.put(ProjectileProblem.Input.INITIAL_SPEED, new PhysicalQuantity(speed, PhysicalUnit.METRE_PER_SECOND));
+        givens.put(ProjectileProblem.Input.LAUNCH_ANGLE, new PhysicalQuantity(angle, PhysicalUnit.DEGREE));
+        givens.put(ProjectileProblem.Input.GRAVITY, new PhysicalQuantity(gravity, PhysicalUnit.METRE_PER_SECOND_SQUARED));
+        givens.put(ProjectileProblem.Input.TIME, new PhysicalQuantity(time, PhysicalUnit.SECOND));
+        ProjectileSolution solution = solver.solve(new ProjectileProblem(
+                "Active simulation state", ProjectileProblem.Target.POSITION_AT_TIME, givens));
+        derivation.getChildren().clear();
+        for (ProjectileSolution.Step step : solution.steps()) {
+            String evaluated = step.results().entrySet().stream()
+                    .map(entry -> entry.getKey() + " = " + format(entry.getValue()))
+                    .reduce((left, right) -> left + "    " + right).orElse("");
+            derivation.getChildren().add(equationRow(step.equation(), evaluated));
+        }
+        if (solution.status() != ProjectileSolution.Status.SOLVED) {
+            derivation.getChildren().add(body("Unable to derive the current position: " + solution.status()));
+        }
 
         currentStateValue.setText(String.format(Locale.ROOT,
                 "%.2f s   |   x %.2f m   |   y %.2f m   |   vx %.2f m/s   |   vy %.2f m/s",
@@ -133,8 +138,8 @@ final class ProjectileLogicView extends BorderPane {
         setOptional(horizontalRangeValue, model.horizontalRange(), "m", "No landing");
     }
 
-    private void updateEquation(int index, String text) {
-        equationValues.get(index).setText(text);
+    private static String format(PhysicalQuantity quantity) {
+        return String.format(Locale.ROOT, "%.2f %s", quantity.value(), quantity.unit().symbol());
     }
 
     private static void setOptional(Label label, OptionalDouble result, String unit, String empty) {

@@ -75,7 +75,7 @@ final class NormalBenchView extends BorderPane {
 
         Label chapter = new Label("01");
         chapter.setFont(Font.font("Georgia", FontWeight.BOLD, 42));
-        chapter.setTextFill(KinetikTheme.COBALT);
+        chapter.setTextFill(PhysoraTheme.COBALT);
         Label vertical = new Label("KINEMATICS");
         vertical.getStyleClass().add("hero-kicker");
         VBox number = new VBox(-6, chapter, vertical);

@@ -4,7 +4,7 @@
     -fx-text-fill: #142e4b;
 }
 
-.kinetik-shell, .bench-view { -fx-background-color: #f5f1e5; }
+.physora-shell, .bench-view { -fx-background-color: #f5f1e5; }
 .eyebrow, .rail-kicker, .hero-kicker {
     -fx-text-fill: #66707a;
     -fx-font-size: 9px;

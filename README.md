@@ -1,3 +1,5 @@
+# PHYSORA
+
 A Java-based interactive physics learning, modeling, and simulation platform for Class 11–12 students, particularly those preparing for JEE Main and JEE Advanced.
 
 ## Vision
@@ -43,7 +45,7 @@ Run the tests and package the project with:
 
 The project is being developed incrementally.
 
-The standalone projectile physics module is implemented and tested. The initial JavaFX simulator interface now provides parameter controls, trajectory rendering, playback, a time scrubber, and live calculated values.
+The current Phase 1 foundation includes an analytical projectile model, a JavaFX simulator, a presentation-independent projectile problem solver, and JUnit coverage for model, solver, and simulation-clock behavior. The problem backend supports more inputs and queries than the UI currently exposes; see `docs/PHASE1_TRACEABILITY.md` for tested capabilities and known gaps. A passing Maven build is not by itself a claim that all Phase 1 acceptance criteria are complete.
 
 AI integration, additional physics chapters, model composition, and advanced learning features are planned for later milestones.
 
@@ -62,6 +64,8 @@ AI integration, additional physics chapters, model composition, and advanced lea
 - `CLAUDE.md` — Claude Code instructions
 - `docs/PROJECT_CONTEXT.md` — physics scope and long-term architecture
 - `docs/PROJECT_GOAL.md` — academic evaluation goals, product quality bar, and design direction
+- `docs/ARCHITECTURE.md` — current implementation structure and runtime flow
+- `docs/PHASE1_TRACEABILITY.md` — Phase 1 requirement status and test mapping
 
 ## License
 

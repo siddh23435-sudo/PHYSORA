@@ -1,10 +1,10 @@
 ﻿# PROJECT CONTEXT
 
-## Interactive Physics Learning, Modeling, and Simulation Platform
+## PHYSORA — Interactive Physics Learning, Modeling, and Simulation Platform
 
 ## 1. Overview
 
-We are developing an interactive physics learning, modeling, and simulation platform for Class 11–12 students, particularly those preparing for JEE Main and JEE Advanced.
+PHYSORA is an interactive physics learning, modeling, and simulation platform for Class 11–12 students, particularly those preparing for JEE Main and JEE Advanced.
 
 The platform should help students:
 

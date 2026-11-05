@@ -2,11 +2,11 @@ package edu.physics.ui;
 
 import javafx.scene.layout.BorderPane;
 
-final class KinetikApplicationShell extends BorderPane {
+final class PhysoraApplicationShell extends BorderPane {
     private final ProjectileSimulationController controller = new ProjectileSimulationController();
 
-    KinetikApplicationShell() {
-        getStyleClass().add("kinetik-shell");
+    PhysoraApplicationShell() {
+        getStyleClass().add("physora-shell");
         setLeft(new ChapterRail());
         setCenter(new NormalBenchView(controller));
     }
