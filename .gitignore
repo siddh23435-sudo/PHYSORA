@@ -1,0 +1,32 @@
+﻿# Java build output
+target/
+build/
+out/
+
+# Gradle
+.gradle/
+
+# Java compiled files
+*.class
+
+# Logs
+*.log
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.bak
