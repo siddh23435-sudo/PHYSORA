@@ -2,6 +2,7 @@ package edu.physics.problem;
 
 /** Supported input units. Values are converted to SI before solving. */
 public enum PhysicalUnit {
+    ONE("1", Dimension.DIMENSIONLESS, 1.0),
     METRE("m", Dimension.LENGTH, 1.0),
     KILOMETRE("km", Dimension.LENGTH, 1_000.0),
     SECOND("s", Dimension.TIME, 1.0),
@@ -12,7 +13,7 @@ public enum PhysicalUnit {
     DEGREE("deg", Dimension.ANGLE, 1.0),
     RADIAN("rad", Dimension.ANGLE, 180.0 / Math.PI);
 
-    public enum Dimension { LENGTH, TIME, SPEED, ACCELERATION, ANGLE }
+    public enum Dimension { DIMENSIONLESS, LENGTH, TIME, SPEED, ACCELERATION, ANGLE }
 
     private final String symbol;
     private final Dimension dimension;

@@ -9,6 +9,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.BorderPane;
@@ -21,6 +22,8 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
 import java.util.Locale;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.OptionalDouble;
 
 /** Coordinates the chapter workspace, model inputs, and the two live model views. */
@@ -28,6 +31,7 @@ final class NormalBenchView extends BorderPane {
     private final ProjectileSimulationController controller;
     private final ProjectileSimulationView simulationView;
     private final ProjectileLogicView logicView;
+    private final AIProblemView aiProblemView;
     private final StackPane viewStack;
     private final Label positionOutput = outputValue();
     private final Label velocityOutput = outputValue();
@@ -35,28 +39,44 @@ final class NormalBenchView extends BorderPane {
     private final Label flightOutput = outputValue();
     private final Label rangeOutput = outputValue();
     private final Label clockOutput = new Label("t = 0.00 s");
+    private final Map<TextField, javafx.beans.property.DoubleProperty> numericControls = new IdentityHashMap<>();
     private boolean updatingTimeSlider;
+    private Node simulationFooter;
 
     NormalBenchView(ProjectileSimulationController controller) {
         this.controller = controller;
+        positionOutput.setId("positionOutput");
+        velocityOutput.setId("velocityOutput");
+        peakOutput.setId("peakOutput");
+        flightOutput.setId("flightOutput");
+        rangeOutput.setId("rangeOutput");
+        clockOutput.setId("clockOutput");
         simulationView = new ProjectileSimulationView(controller);
         logicView = new ProjectileLogicView(controller);
-        viewStack = new StackPane(simulationView, logicView);
+        aiProblemView = new AIProblemView();
+        logicView.setId("logicView");
+        viewStack = new StackPane(simulationView, logicView, aiProblemView);
         logicView.setVisible(false);
         logicView.setManaged(false);
+        aiProblemView.setVisible(false);
+        aiProblemView.setManaged(false);
 
         getStyleClass().add("bench-view");
         setTop(buildTop());
         HBox workArea = new HBox(20, buildViews(), buildInspector());
         workArea.setPadding(new Insets(0, 24, 8, 24));
         setCenter(workArea);
-        setBottom(buildFooter());
+        simulationFooter = buildFooter();
+        setBottom(simulationFooter);
 
         controller.modelProperty().addListener((obs, oldModel, newModel) -> refreshOutputs());
         controller.simulationTimeProperty().addListener((obs, oldTime, newTime) -> refreshOutputs());
         controller.launchSpeedProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
         controller.launchAngleProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
         controller.gravityProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
+        controller.initialXProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
+        controller.initialYProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
+        controller.landingYProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
         refreshOutputs();
     }
 
@@ -105,16 +125,23 @@ final class NormalBenchView extends BorderPane {
         ToggleGroup group = new ToggleGroup();
         ToggleButton simulationTab = new ToggleButton("SIMULATION VIEW");
         ToggleButton logicTab = new ToggleButton("LOGIC VIEW");
+        ToggleButton aiTab = new ToggleButton("AI PROBLEM");
+        simulationTab.setId("simulationViewTab");
+        logicTab.setId("logicViewTab");
+        aiTab.setId("aiProblemTab");
         simulationTab.setToggleGroup(group);
         logicTab.setToggleGroup(group);
+        aiTab.setToggleGroup(group);
         simulationTab.setSelected(true);
         simulationTab.getStyleClass().add("view-tab");
         logicTab.getStyleClass().add("view-tab");
-        simulationTab.setOnAction(event -> showView(true));
-        logicTab.setOnAction(event -> showView(false));
+        aiTab.getStyleClass().add("view-tab");
+        simulationTab.setOnAction(event -> showView(ActiveView.SIMULATION));
+        logicTab.setOnAction(event -> showView(ActiveView.LOGIC));
+        aiTab.setOnAction(event -> showView(ActiveView.AI));
 
-        Label mode = eyebrow("SAME MODEL   /   TWO WAYS TO INSPECT");
-        HBox bar = new HBox(0, simulationTab, logicTab, spacer(), mode);
+        Label mode = eyebrow("SIMULATE   /   INSPECT   /   ASK");
+        HBox bar = new HBox(0, simulationTab, logicTab, aiTab, spacer(), mode);
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(0, 26, 0, 28));
         bar.setStyle("-fx-border-color: transparent transparent #cbc4b4 transparent;");
@@ -128,10 +155,8 @@ final class NormalBenchView extends BorderPane {
         return viewStack;
     }
 
-    private VBox buildInspector() {
+    private Node buildInspector() {
         VBox inspector = new VBox(19);
-        inspector.setPrefWidth(286);
-        inspector.setMinWidth(260);
         inspector.setPadding(new Insets(20, 18, 18, 18));
         inspector.getStyleClass().add("model-inspector");
 
@@ -143,9 +168,18 @@ final class NormalBenchView extends BorderPane {
         Slider speed = parameterSlider(0, 50, 20, 1);
         Slider angle = parameterSlider(0, 90, 45, 1);
         Slider gravity = parameterSlider(0, 20, 9.81, 0.1);
+        speed.setId("launchSpeedSlider");
+        angle.setId("launchAngleSlider");
+        gravity.setId("gravitySlider");
         speed.valueProperty().bindBidirectional(controller.launchSpeedProperty());
         angle.valueProperty().bindBidirectional(controller.launchAngleProperty());
         gravity.valueProperty().bindBidirectional(controller.gravityProperty());
+
+        VBox coordinates = new VBox(10,
+                eyebrow("LAUNCH AND LANDING"),
+                numericInput("Initial x", "m", "initialXInput", controller.initialXProperty()),
+                numericInput("Initial y", "m", "initialYInput", controller.initialYProperty()),
+                numericInput("Landing height", "m", "landingYInput", controller.landingYProperty()));
 
         VBox inputs = new VBox(20,
                 parameter("Launch speed", "m/s", speed, controller.launchSpeedProperty()),
@@ -154,9 +188,12 @@ final class NormalBenchView extends BorderPane {
 
         Node separator = separator();
         Label assumptionsTitle = eyebrow("MODEL ASSUMPTIONS");
-        Label assumptions = new Label("2D motion\nConstant downward gravity\nAir resistance ignored\nLaunch and ground at y = 0");
+        Label assumptions = new Label();
+        assumptions.setId("assumptionsOutput");
+        refreshAssumptions(assumptions);
         assumptions.getStyleClass().add("assumption-copy");
         VBox assumptionsBlock = new VBox(9, assumptionsTitle, assumptions);
+        controller.modelProperty().addListener((obs, oldModel, newModel) -> refreshAssumptions(assumptions));
 
         Label vectorTitle = eyebrow("SIMULATION OVERLAY");
         javafx.scene.control.CheckBox vectors = new javafx.scene.control.CheckBox("Show velocity components");
@@ -166,9 +203,66 @@ final class NormalBenchView extends BorderPane {
                 simulationView.setShowVelocityComponents(newValue));
         VBox overlayBlock = new VBox(8, vectorTitle, vectors);
 
-        inspector.getChildren().addAll(intro, separator, inputs, separator(), assumptionsBlock,
+        inspector.getChildren().addAll(intro, separator, inputs, separator(), coordinates, separator(), assumptionsBlock,
                 separator(), overlayBlock);
-        return inspector;
+        ScrollPane scroll = new ScrollPane(inspector);
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setPrefViewportWidth(286);
+        scroll.setMinWidth(260);
+        scroll.setMaxHeight(Double.MAX_VALUE);
+        scroll.getStyleClass().add("inspector-scroll");
+        return scroll;
+    }
+
+    private VBox numericInput(String name, String unit, String id,
+                              javafx.beans.property.DoubleProperty property) {
+        Label label = new Label(name);
+        label.getStyleClass().add("parameter-name");
+        TextField field = new TextField(formatInput(property.get()));
+        field.setId(id);
+        field.setAccessibleText(name + " in " + unit);
+        field.setPrefColumnCount(8);
+        numericControls.put(field, property);
+        Label unitLabel = new Label(unit);
+        unitLabel.getStyleClass().add("parameter-value");
+        Label error = new Label();
+        error.setId(id + "Error");
+        error.getStyleClass().add("validation-message");
+        error.setVisible(false);
+        error.setManaged(false);
+        field.textProperty().addListener((obs, oldText, text) -> {
+            try {
+                if (text == null || text.isBlank()) throw new NumberFormatException();
+                double value = Double.parseDouble(text.trim());
+                if (!Double.isFinite(value)) throw new NumberFormatException();
+                property.set(value);
+                field.getStyleClass().remove("input-invalid");
+                error.setText("");
+                error.setVisible(false);
+                error.setManaged(false);
+            } catch (NumberFormatException ex) {
+                if (!field.getStyleClass().contains("input-invalid")) field.getStyleClass().add("input-invalid");
+                error.setText("Enter a finite number.");
+                error.setVisible(true);
+                error.setManaged(true);
+            }
+        });
+        property.addListener((obs, oldValue, newValue) -> {
+            if (!field.isFocused()) field.setText(formatInput(newValue.doubleValue()));
+        });
+        return new VBox(5, label, new HBox(8, field, unitLabel), error);
+    }
+
+    private void refreshAssumptions(Label assumptions) {
+        ProjectileMotion model = controller.model();
+        assumptions.setText(String.format(Locale.ROOT,
+                "2D motion\nConstant downward gravity\nAir resistance ignored\nLaunch (%.2f, %.2f) m\nLanding surface y = %.2f m",
+                model.initialX(), model.initialY(), model.landingY()));
+    }
+
+    private static String formatInput(double value) {
+        return String.format(Locale.ROOT, "%.2f", value);
     }
 
     private VBox parameter(String name, String unit, Slider slider, javafx.beans.property.DoubleProperty property) {
@@ -210,15 +304,22 @@ final class NormalBenchView extends BorderPane {
         play.getStyleClass().add("transport-primary");
         pause.getStyleClass().add("transport-secondary");
         reset.getStyleClass().add("transport-secondary");
+        play.setId("playButton");
+        pause.setId("pauseButton");
+        reset.setId("resetButton");
         play.setOnAction(event -> controller.play());
         pause.setOnAction(event -> controller.pause());
-        reset.setOnAction(event -> controller.reset());
+        reset.setOnAction(event -> {
+            controller.reset();
+            numericControls.forEach((field, property) -> field.setText(formatInput(property.get())));
+        });
         updatePlayability(play);
         controller.playingProperty().addListener((obs, oldValue, newValue) -> updatePlayability(play));
         controller.modelProperty().addListener((obs, oldValue, newValue) -> updatePlayability(play));
         pause.disableProperty().bind(controller.playingProperty().not());
 
         Slider timeline = new Slider(0, controller.timelineDuration(), 0);
+        timeline.setId("timeSlider");
         timeline.setMaxWidth(Double.MAX_VALUE);
         timeline.valueProperty().addListener((obs, oldValue, newValue) -> {
             if (!updatingTimeSlider) {
@@ -234,6 +335,7 @@ final class NormalBenchView extends BorderPane {
                 timeline.setMax(controller.timelineDuration()));
 
         Slider playback = new Slider(0.25, 3.0, 1.0);
+        playback.setId("playbackRateSlider");
         playback.setPrefWidth(130);
         playback.valueProperty().bindBidirectional(controller.playbackSpeedProperty());
         Label speedText = new Label("1.00×");
@@ -271,12 +373,22 @@ final class NormalBenchView extends BorderPane {
         rangeOutput.setText(optional(model.horizontalRange(), "m", "no landing"));
     }
 
-    private void showView(boolean simulation) {
+    private void showView(ActiveView activeView) {
+        boolean simulation = activeView == ActiveView.SIMULATION;
+        boolean logic = activeView == ActiveView.LOGIC;
+        boolean ai = activeView == ActiveView.AI;
         simulationView.setVisible(simulation);
         simulationView.setManaged(simulation);
-        logicView.setVisible(!simulation);
-        logicView.setManaged(!simulation);
+        logicView.setVisible(logic);
+        logicView.setManaged(logic);
+        aiProblemView.setVisible(ai);
+        aiProblemView.setManaged(ai);
+        setBottom(ai ? null : simulationFooter);
     }
+
+    void dispose() { aiProblemView.dispose(); }
+
+    private enum ActiveView { SIMULATION, LOGIC, AI }
 
     private static VBox result(String title, Label value) {
         Label caption = eyebrow(title);

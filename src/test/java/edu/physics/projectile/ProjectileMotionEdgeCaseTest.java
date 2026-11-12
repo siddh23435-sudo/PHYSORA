@@ -136,8 +136,18 @@ class ProjectileMotionEdgeCaseTest {
     @Test
     void handlesLandingAboveAndBelowTheLaunchLevel() {
         ProjectileMotion above = new ProjectileMotion(20, 90, 10, 0, 0, 15);
-        assertEquals(1, above.timeOfFlight().orElseThrow(), TOL);
+        assertEquals(3, above.timeOfFlight().orElseThrow(), TOL);
         assertEquals(15, above.stateAt(above.timeOfFlight().orElseThrow()).y(), TOL);
+        assertTrue(above.stateAt(above.timeOfFlight().orElseThrow()).vy() < 0,
+                "Landing on an elevated surface is the descending intersection");
+
+        ProjectileMotion unreachableHigherSurface = new ProjectileMotion(10, 90, 10, 0, 0, 6);
+        assertTrue(unreachableHigherSurface.timeOfFlight().isEmpty());
+
+        ProjectileMotion upwardUnboundedToHigherHeight = new ProjectileMotion(10, 90, 0, 0, 0, 6);
+        assertTrue(upwardUnboundedToHigherHeight.timesAtHeight(6).hasSolutions());
+        assertTrue(upwardUnboundedToHigherHeight.timeOfFlight().isEmpty(),
+                "An upward-only crossing is not a landing event");
 
         ProjectileMotion below = new ProjectileMotion(10, -30, 10, 0, 5, -10);
         double flight = below.timeOfFlight().orElseThrow();
@@ -196,5 +206,7 @@ class ProjectileMotionEdgeCaseTest {
         assertThrows(IllegalArgumentException.class, () -> model.stateAt(Double.POSITIVE_INFINITY));
         assertThrows(IllegalArgumentException.class, () -> model.timesAtHorizontalPosition(Double.NaN));
         assertThrows(ArithmeticException.class, () -> model.stateAt(Double.MAX_VALUE));
+        ProjectileMotion extreme = new ProjectileMotion(1e200, 90, 1e200, 0, 0, 0);
+        assertThrows(ArithmeticException.class, () -> extreme.timesAtHeight(-1));
     }
 }

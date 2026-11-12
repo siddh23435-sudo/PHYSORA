@@ -64,6 +64,13 @@
 .legend-orange { -fx-text-fill: #e56843; }
 
 .model-inspector { -fx-background-color: #e9e2d0; -fx-border-color: #cbc4b4; -fx-border-width: 1 0 0 1; }
+.inspector-scroll, .inspector-scroll .viewport { -fx-background-color: #e9e2d0; -fx-background: #e9e2d0; -fx-padding: 0; }
+.inspector-scroll .scroll-bar:vertical { -fx-background-color: transparent; -fx-pref-width: 5px; }
+.inspector-scroll .scroll-bar:vertical .thumb { -fx-background-color: #b9b09e; -fx-background-radius: 0; }
+.inspector-scroll .scroll-bar:vertical .track { -fx-background-color: transparent; }
+.model-inspector .text-field { -fx-background-color: #f5f1e5; -fx-border-color: #b9b09e; -fx-border-radius: 0; -fx-background-radius: 0; -fx-text-fill: #142e4b; -fx-font-family: "Consolas"; -fx-font-size: 11px; -fx-padding: 5 7 5 7; }
+.model-inspector .text-field.input-invalid { -fx-border-color: #b43827; -fx-border-width: 1.5; }
+.validation-message { -fx-text-fill: #a63324; -fx-font-size: 9px; }
 .inspector-title { -fx-font-family: "Georgia", serif; -fx-font-size: 18px; -fx-text-fill: #142e4b; }
 .parameter-name { -fx-font-size: 10px; -fx-text-fill: #142e4b; }
 .parameter-value { -fx-font-family: "Consolas"; -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #142e4b; }
@@ -107,3 +114,23 @@
 .state-value, .logic-result-value { -fx-font-family: "Consolas"; -fx-font-size: 10px; -fx-text-fill: #142e4b; }
 .logic-result-line { -fx-padding: 6 0 6 0; }
 .logic-result-line > .label:first-child { -fx-font-size: 10px; -fx-text-fill: #66707a; }
+
+.ai-problem-view { -fx-background-color: #f5f1e5; }
+.ai-problem-view .text-area { -fx-background-color: #fffdf7; -fx-border-color: #cbc4b4; -fx-border-radius: 0; -fx-background-radius: 0; -fx-text-fill: #142e4b; -fx-font-family: "Segoe UI", sans-serif; -fx-font-size: 12px; }
+.ai-problem-view .text-area .content { -fx-background-color: #fffdf7; }
+.ai-input-section { -fx-background-color: #e9e2d0; -fx-border-color: #cbc4b4; -fx-border-width: 1; -fx-padding: 14; }
+.ai-status { -fx-font-size: 11px; -fx-text-fill: #2453d4; }
+.ai-status-error { -fx-text-fill: #a63324; }
+.ai-clarification-box { -fx-background-color: #f5f1e5; -fx-border-color: #e56843; -fx-border-width: 1; }
+.ai-solution-output { -fx-font-family: "Consolas", monospace; -fx-font-size: 11px; -fx-control-inner-background: #fffdf7; }
+.ai-config-section { -fx-background-color: #e9e2d0; -fx-border-color: #cbc4b4; -fx-border-width: 1; -fx-padding: 7 10 7 10; }
+.ai-mode-combo { -fx-background-color: #fffdf7; -fx-border-color: #b9b09e; -fx-border-radius: 0; -fx-background-radius: 0; -fx-font-size: 11px; }
+.ai-mode-combo .list-cell { -fx-text-fill: #142e4b; -fx-background-color: #fffdf7; -fx-padding: 3 8 3 8; }
+.ai-config-section .text-field { -fx-background-color: #fffdf7; -fx-border-color: #b9b09e; -fx-border-radius: 0; -fx-background-radius: 0; -fx-text-fill: #142e4b; -fx-font-family: "Consolas"; -fx-font-size: 11px; -fx-padding: 4 7 4 7; }
+.ai-config-summary { -fx-font-family: "Consolas", monospace; -fx-font-size: 10px; -fx-text-fill: #495766; }
+.ai-attribution-panel { -fx-padding: 0; }
+.ai-attribution-card { -fx-background-color: #e9e2d0; -fx-border-color: #cbc4b4; -fx-border-width: 1; -fx-padding: 5 8 5 8; }
+.ai-attribution-card-fallback { -fx-border-color: #e56843; }
+.ai-attribution-card-error { -fx-border-color: #a63324; }
+.ai-attribution-title { -fx-font-size: 9px; -fx-font-weight: bold; -fx-text-fill: #66707a; }
+.ai-attribution-body { -fx-font-size: 10px; -fx-text-fill: #142e4b; }

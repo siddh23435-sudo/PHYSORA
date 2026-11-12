@@ -94,7 +94,7 @@ AI must not silently decide that its interpretation is correct.
 
 The resulting model should be editable in the Normal Bench.
 
-AI integration is deferred from the first milestone.
+AI integration was deferred from Phase 1. Phase 2 adds a bounded text-only projectile-question workflow using Google Gemini for interpretation and explanatory prose, with all accepted numerical answers produced by the deterministic solver. This does not authorize AI model editing, simulation control, image interpretation, persistence, or other chapters.
 
 ## 4. AI Copilot
 
@@ -631,7 +631,7 @@ If launch and landing heights differ, solve:
 
 y0 + v0 sin(θ) t - 0.5 g t² = y_landing
 
-Choose the physically relevant nonnegative root.
+For the simulator's landing time, use the first future downward crossing of the landing height; an upward crossing is not a landing event. Generic position/height queries should continue to return every relevant nonnegative root rather than discarding the alternate crossing.
 
 Do not blindly use the equal-height range equation for an unequal-height problem.
 

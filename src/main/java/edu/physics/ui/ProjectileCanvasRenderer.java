@@ -45,10 +45,10 @@ final class ProjectileCanvasRenderer {
         samplePathIfNeeded(model, endTime);
         ProjectileMotion.State current = model.stateAt(time);
 
-        double minX = 0.0;
-        double maxX = 0.0;
-        double minY = 0.0;
-        double maxY = 0.0;
+        double minX = Math.min(0.0, model.initialX());
+        double maxX = Math.max(0.0, model.initialX());
+        double minY = Math.min(0.0, Math.min(model.initialY(), model.landingY()));
+        double maxY = Math.max(0.0, Math.max(model.initialY(), model.landingY()));
         for (int i = 0; i < sampledX.length; i++) {
             minX = Math.min(minX, sampledX[i]);
             maxX = Math.max(maxX, sampledX[i]);
@@ -74,7 +74,12 @@ final class ProjectileCanvasRenderer {
 
         drawGrid(gc, left, right, top, bottom);
         drawAxes(gc, left, right, top, bottom, originX, groundScreenY, minX, maxX, minY, maxY, scale);
+        drawLandingSurface(gc, left, right, groundScreenY - model.landingY() * scale, model.landingY(), top, bottom);
         drawTrajectory(gc, originX, groundScreenY, scale);
+        model.apexState().ifPresent(apex -> drawEventMarker(gc, apex, originX, groundScreenY,
+                scale, "APEX", PhysoraTheme.LIME, right, top, bottom));
+        flightTime.ifPresent(landingTime -> drawEventMarker(gc, model.stateAt(landingTime),
+                originX, groundScreenY, scale, "LANDING", PhysoraTheme.INK, right, top, bottom));
         drawProjectile(gc, current, originX, groundScreenY, scale);
         if (showVelocityComponents) {
             drawVelocityComponents(gc, current, originX, groundScreenY, scale);
@@ -127,15 +132,37 @@ final class ProjectileCanvasRenderer {
             gc.strokeLine(screenX, groundY - 3, screenX, groundY + 3);
             gc.fillText(String.format(Locale.ROOT, "%.0f", x), screenX - 5, groundY + 15);
         }
+        boolean zeroHeightTickPresent = false;
         for (int i = 0; i <= 4; i++) {
             double y = minY + (maxY - minY) * i / 4.0;
+            if (Math.abs(y) <= 8.0 * Math.ulp(Math.max(1.0, Math.max(Math.abs(minY), Math.abs(maxY))))) {
+                zeroHeightTickPresent = true;
+            }
             double screenY = groundY - y * scale;
             gc.strokeLine(originX - 3, screenY, originX + 3, screenY);
             gc.fillText(String.format(Locale.ROOT, "%.1f", y), originX - 34, screenY + 3);
         }
-        gc.setFill(PhysoraTheme.MUTED);
+        if (!zeroHeightTickPresent && minY < 0.0 && maxY > 0.0) {
+            gc.strokeLine(originX - 4, groundY, originX + 4, groundY);
+            gc.fillText("0.0", originX - 34, groundY + 3);
+        }
+    }
+
+    private static void drawLandingSurface(GraphicsContext gc, double left, double right,
+                                           double screenY, double landingY, double top, double bottom) {
+        if (landingY == 0.0) return;
+        gc.save();
+        gc.setStroke(PhysoraTheme.ORANGE);
+        gc.setLineWidth(1.4);
+        gc.setLineDashes(7, 5);
+        gc.strokeLine(left, screenY, right, screenY);
+        gc.setLineDashes();
+        gc.setFill(PhysoraTheme.ORANGE);
         gc.setFont(Font.font("Segoe UI", 10));
-        gc.fillText("GROUND  /  y = 0", left + 8, Math.max(top + 15, groundY - 9));
+        double labelY = screenY > top + 18 ? screenY - 8 : screenY + 14;
+        if (labelY > bottom) labelY = bottom - 4;
+        gc.fillText(String.format(Locale.ROOT, "LANDING SURFACE  /  y = %.2f m", landingY), left + 8, labelY);
+        gc.restore();
     }
 
     private void drawTrajectory(GraphicsContext gc, double originX, double groundY, double scale) {
@@ -149,6 +176,27 @@ final class ProjectileCanvasRenderer {
         gc.stroke();
     }
 
+    private static void drawEventMarker(GraphicsContext gc, ProjectileMotion.State state,
+                                        double originX, double groundY, double scale,
+                                        String label, Color color, double right, double top, double bottom) {
+        double x = originX + state.x() * scale;
+        double y = groundY - state.y() * scale;
+        gc.setFill(color);
+        gc.fillOval(x - 5.5, y - 5.5, 11, 11);
+        gc.setStroke(PhysoraTheme.PAPER);
+        gc.setLineWidth(1.4);
+        gc.strokeOval(x - 5.5, y - 5.5, 11, 11);
+        gc.setFill(PhysoraTheme.INK);
+        gc.setFont(Font.font("Segoe UI", 9));
+        double labelY = y - 9;
+        if (labelY < top + 10) labelY = y + 17;
+        if (labelY > bottom) labelY = bottom - 4;
+        double estimatedWidth = label.length() * 6.0;
+        double labelX = x + 8;
+        if (labelX + estimatedWidth > right - 4) labelX = x - estimatedWidth - 8;
+        gc.fillText(label, labelX, labelY);
+    }
+
     private static void drawProjectile(GraphicsContext gc, ProjectileMotion.State state,
                                        double originX, double groundY, double scale) {
         double x = originX + state.x() * scale;
@@ -158,9 +206,6 @@ final class ProjectileCanvasRenderer {
         gc.setStroke(PhysoraTheme.PAPER);
         gc.setLineWidth(1.5);
         gc.strokeOval(x - 6.5, y - 6.5, 13, 13);
-        gc.setFill(PhysoraTheme.INK);
-        gc.setFont(Font.font("Consolas", 10));
-        gc.fillText(String.format(Locale.ROOT, "(%.2f, %.2f) m", state.x(), state.y()), x + 11, y - 10);
     }
 
     private static void drawVelocityComponents(GraphicsContext gc, ProjectileMotion.State state,

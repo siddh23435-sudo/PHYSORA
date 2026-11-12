@@ -17,6 +17,7 @@ final class ProjectileSimulationView extends BorderPane {
 
     ProjectileSimulationView(ProjectileSimulationController controller) {
         this.controller = controller;
+        setId("simulationView");
         setPadding(new Insets(10, 16, 8, 16));
         getStyleClass().add("simulation-view");
 
@@ -27,9 +28,9 @@ final class ProjectileSimulationView extends BorderPane {
         VBox title = new VBox(4, heading, note);
 
         Label xLegend = legend("—", "trajectory", "legend-cobalt");
-        Label vxLegend = legend("+x", "velocity component", "legend-blue");
-        Label vyLegend = legend("+y", "velocity component", "legend-orange");
-        HBox legend = new HBox(17, xLegend, vxLegend, vyLegend);
+        Label vxLegend = legend("+x", "vx", "legend-blue");
+        Label vyLegend = legend("+y", "vy", "legend-orange");
+        HBox legend = new HBox(12, xLegend, vxLegend, vyLegend);
         legend.setAlignment(Pos.CENTER_RIGHT);
         HBox top = new HBox(title, legend);
         top.setAlignment(Pos.CENTER_LEFT);

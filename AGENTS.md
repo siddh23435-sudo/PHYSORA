@@ -8,7 +8,7 @@ The platform is intended to help students construct physical models, understand 
 
 Read `docs/PROJECT_CONTEXT.md` for the physics scope and long-term architecture. Read `docs/PROJECT_GOAL.md` before major product or UI decisions; it defines the academic evaluation bar, quality standards, and PHYSORA product direction.
 
-The active milestone is PHYSORA Phase 1: a complete, functional projectile-motion application foundation, not a calculations-only demo. A green build alone does not establish milestone completion. Every advertised feature must be connected to the application and verified against normal, boundary, invalid, ambiguous, and numerically difficult cases where applicable. Keep the requirement-to-test status in `docs/PHASE1_TRACEABILITY.md` current; label partial and unverified work honestly.
+Phase 1 is the existing projectile simulator and remains the product foundation. The active milestone is Phase 2: a constrained, provider-powered workflow for interpreting projectile-motion questions, validating them, solving through the deterministic Phase 1 solver, and presenting grounded explanations. Keep requirement status in `docs/PHASE2_TRACEABILITY.md` current; label partial and unverified work honestly.
 
 ## 2. Mandatory Requirements
 
@@ -19,7 +19,7 @@ The active milestone is PHYSORA Phase 1: a complete, functional projectile-motio
 - The old ParticleForge repository is not being continued. This is a fresh project.
 - The first development milestone is a working Projectile Motion Simulator.
 - Physics correctness takes priority over visual polish.
-- Do not introduce AI integration into the first milestone.
+- Phase 2 explicitly permits Google Gemini integration only for natural-language interpretation and grounded explanatory prose. Never let provider output directly supply accepted numerical answers or replace the deterministic solver.
 
 ## 3. Role of the Coding Agent
 
@@ -172,8 +172,8 @@ The initial feature is the Projectile Motion Simulator.
 
 Do not implement the following unless explicitly requested:
 
-- AI question interpretation
-- AI Copilot
+- AI features beyond the constrained Phase 2 projectile-question workflow
+- AI Copilot actions that modify models or execute simulation frames
 - Database persistence
 - User accounts
 - Collaboration

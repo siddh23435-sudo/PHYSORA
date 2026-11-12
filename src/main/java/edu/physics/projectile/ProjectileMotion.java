@@ -15,6 +15,7 @@ import java.util.OptionalDouble;
  */
 public final class ProjectileMotion {
     private static final double ROOT_ROUNDOFF_ULPS = 8.0;
+    private static final double SURFACE_ROUNDOFF_ULPS = 16.0;
 
     /** Two-dimensional vector in SI units. */
     public record Vector2(double x, double y) {
@@ -44,51 +45,144 @@ public final class ProjectileMotion {
     private final double gravity;
     private final double initialX;
     private final double initialY;
-    private final double landingY;
+    private final LandingSurface landingSurface;
     private final double initialVx;
     private final double initialVy;
     private final double initialSpeed;
     private final double launchAngleDegrees;
 
+    /**
+     * Constructs a projectile motion model with a horizontal landing surface at {@code y = landingY}.
+     */
     public ProjectileMotion(double initialSpeed, double launchAngleDegrees,
                             double gravity, double initialX, double initialY,
                             double landingY) {
-        requireFinite("initial speed", initialSpeed);
+        this(initialSpeed, launchAngleDegrees, gravity, initialX, initialY,
+                new LandingSurface.HorizontalPlane(landingY));
+    }
+
+    /**
+     * Constructs a projectile motion model over an arbitrary {@link LandingSurface}.
+     */
+    public ProjectileMotion(double initialSpeed, double launchAngleDegrees,
+                            double gravity, double initialX, double initialY,
+                            LandingSurface landingSurface) {
+        this(
+                resolveVx(requireNonNegativeSpeed(initialSpeed), requireFiniteAngle(launchAngleDegrees)),
+                resolveVy(initialSpeed, launchAngleDegrees),
+                initialSpeed,
+                launchAngleDegrees,
+                gravity,
+                initialX,
+                initialY,
+                landingSurface);
+    }
+
+    /**
+     * Constructs a projectile motion model directly from Cartesian initial velocity components
+     * {@code (initialVx, initialVy)} over the given {@link LandingSurface}.
+     */
+    public static ProjectileMotion fromVelocityComponents(double initialVx, double initialVy,
+                                                        double gravity, double initialX,
+                                                        double initialY, LandingSurface landingSurface) {
+        requireFinite("initial horizontal velocity", initialVx);
+        requireFinite("initial vertical velocity", initialVy);
+        double vx = initialVx == 0.0 ? 0.0 : initialVx;
+        double vy = initialVy == 0.0 ? 0.0 : initialVy;
+        double speed = finite(Math.hypot(vx, vy), "initial speed");
+        double angleDegrees = (vx == 0.0 && vy == 0.0) ? 0.0 : Math.toDegrees(Math.atan2(vy, vx));
+        return new ProjectileMotion(vx, vy, speed, angleDegrees, gravity, initialX, initialY, landingSurface);
+    }
+
+    private ProjectileMotion(double initialVx, double initialVy,
+                             double initialSpeed, double launchAngleDegrees,
+                             double gravity, double initialX, double initialY,
+                             LandingSurface landingSurface) {
+        requireFinite("initial horizontal velocity", initialVx);
+        requireFinite("initial vertical velocity", initialVy);
+        requireNonNegativeFinite("initial speed", initialSpeed);
         requireFinite("launch angle", launchAngleDegrees);
-        requireFinite("gravity", gravity);
+        requireNonNegativeFinite("gravity", gravity);
         requireFinite("initial x", initialX);
         requireFinite("initial y", initialY);
-        requireFinite("landing y", landingY);
-        if (initialSpeed < 0.0) {
-            throw new IllegalArgumentException("Initial speed must be non-negative");
+        if (landingSurface == null) {
+            throw new IllegalArgumentException("landing surface is required");
         }
-        if (gravity < 0.0) {
-            throw new IllegalArgumentException("Gravity magnitude must be non-negative");
+
+        if (!landingSurface.isHorizontal()) {
+            double rawClearance = finite(initialY - landingSurface.heightAt(initialX),
+                    "initial surface height offset");
+            double scale = inclineHeightScale(initialX, initialY, landingSurface);
+            double tolerance = scale == 0.0 ? 0.0 : SURFACE_ROUNDOFF_ULPS * Math.ulp(scale);
+            if (rawClearance < -tolerance) {
+                throw new IllegalArgumentException(
+                        "Launch position cannot start strictly below an inclined landing surface");
+            }
         }
 
         this.gravity = gravity;
-        this.initialX = initialX;
-        this.initialY = initialY;
-        this.landingY = landingY;
-        this.initialSpeed = initialSpeed;
-        this.launchAngleDegrees = launchAngleDegrees;
-        double radians = Math.toRadians(launchAngleDegrees % 360.0);
-        double cosine = Math.cos(radians);
-        double sine = Math.sin(radians);
-        // Remove trigonometric residue at the cardinal launch directions.
-        if (launchAngleDegrees % 90.0 == 0.0) {
-            int quadrant = Math.floorMod((int) Math.round((launchAngleDegrees % 360.0) / 90.0), 4);
-            cosine = switch (quadrant) { case 0 -> 1.0; case 2 -> -1.0; default -> 0.0; };
-            sine = switch (quadrant) { case 1 -> 1.0; case 3 -> -1.0; default -> 0.0; };
+        this.initialX = initialX == 0.0 ? 0.0 : initialX;
+        this.initialY = initialY == 0.0 ? 0.0 : initialY;
+        this.landingSurface = landingSurface;
+        this.initialVx = initialVx == 0.0 ? 0.0 : initialVx;
+        this.initialVy = initialVy == 0.0 ? 0.0 : initialVy;
+        this.initialSpeed = initialSpeed == 0.0 ? 0.0 : initialSpeed;
+        this.launchAngleDegrees = launchAngleDegrees == 0.0 ? 0.0 : launchAngleDegrees;
+    }
+
+    private static double requireNonNegativeSpeed(double initialSpeed) {
+        requireNonNegativeFinite("initial speed", initialSpeed);
+        return initialSpeed;
+    }
+
+    private static double requireFiniteAngle(double launchAngleDegrees) {
+        requireFinite("launch angle", launchAngleDegrees);
+        return launchAngleDegrees;
+    }
+
+    private static double resolveVx(double initialSpeed, double launchAngleDegrees) {
+        double cosine = cosDegrees(launchAngleDegrees);
+        return finite(initialSpeed * cosine, "initial horizontal velocity");
+    }
+
+    private static double resolveVy(double initialSpeed, double launchAngleDegrees) {
+        double sine = sinDegrees(launchAngleDegrees);
+        return finite(initialSpeed * sine, "initial vertical velocity");
+    }
+
+    private static double cosDegrees(double degrees) {
+        if (degrees % 90.0 == 0.0) {
+            int quadrant = Math.floorMod((int) Math.round((degrees % 360.0) / 90.0), 4);
+            return switch (quadrant) { case 0 -> 1.0; case 2 -> -1.0; default -> 0.0; };
         }
-        this.initialVx = finite(initialSpeed * cosine, "initial horizontal velocity");
-        this.initialVy = finite(initialSpeed * sine, "initial vertical velocity");
+        return Math.cos(Math.toRadians(degrees % 360.0));
+    }
+
+    private static double sinDegrees(double degrees) {
+        if (degrees % 90.0 == 0.0) {
+            int quadrant = Math.floorMod((int) Math.round((degrees % 360.0) / 90.0), 4);
+            return switch (quadrant) { case 1 -> 1.0; case 3 -> -1.0; default -> 0.0; };
+        }
+        return Math.sin(Math.toRadians(degrees % 360.0));
     }
 
     public double gravity() { return gravity; }
     public double initialX() { return initialX; }
     public double initialY() { return initialY; }
-    public double landingY() { return landingY; }
+    public LandingSurface landingSurface() { return landingSurface; }
+
+    /**
+     * Vertical landing coordinate for horizontal landing surfaces.
+     *
+     * @throws IllegalStateException if the configured landing surface is non-horizontal
+     */
+    public double landingY() {
+        if (!landingSurface.isHorizontal()) {
+            throw new IllegalStateException(
+                    "Landing surface is inclined; landingY is not constant — use landingSurface()");
+        }
+        return landingSurface.anchorY();
+    }
     public double initialSpeed() { return initialSpeed; }
     public double launchAngleDegrees() { return launchAngleDegrees; }
     public double initialVx() { return initialVx; }
@@ -156,21 +250,21 @@ public final class ProjectileMotion {
         return OptionalDouble.of(Math.toDegrees(Math.atan2(state.vy, state.vx)));
     }
 
-    /** First landing crossing under the model's convention; empty means no future landing. */
+    /** First future downward crossing of the configured landing surface; empty means no future landing. */
     public OptionalDouble timeOfFlight() {
-        TimeSolutions crossings = timesAtHeight(landingY);
-        if (crossings.infinitelyMany()) {
-            return initialVy <= 0.0 ? OptionalDouble.of(0.0) : OptionalDouble.empty();
+        if (landingSurface.isHorizontal()) {
+            return timeOfFlightHorizontal(landingSurface.anchorY());
         }
-        if (crossings.times().isEmpty()) return OptionalDouble.empty();
-        if (initialY == landingY && initialVy > 0.0 && gravity == 0.0) {
-            return OptionalDouble.empty();
-        }
-        if (initialY == landingY && initialVy <= 0.0) return OptionalDouble.of(0.0);
-        return crossings.times().stream().filter(t -> t > 0.0).mapToDouble(Double::doubleValue).min();
+        return timeOfFlightInclined();
     }
 
-    /** Time at the apex; empty when positive vertical motion is unbounded (g = 0). */
+    /** Trajectory state at landing, or empty if no landing occurs. */
+    public Optional<State> landingState() {
+        OptionalDouble flight = timeOfFlight();
+        return flight.isPresent() ? Optional.of(stateAt(flight.getAsDouble())) : Optional.empty();
+    }
+
+    /** Time at the unconstrained apex; empty when positive vertical motion is unbounded (g = 0). */
     public OptionalDouble timeToApex() {
         if (gravity == 0.0) {
             return initialVy > 0.0 ? OptionalDouble.empty() : OptionalDouble.of(0.0);
@@ -178,7 +272,7 @@ public final class ProjectileMotion {
         return OptionalDouble.of(Math.max(0.0, initialVy / gravity));
     }
 
-    /** Greatest vertical coordinate reached, or empty when unbounded. */
+    /** Greatest unconstrained vertical coordinate reached, or empty when unbounded. */
     public OptionalDouble maximumHeight() {
         if (gravity == 0.0) {
             return initialVy > 0.0 ? OptionalDouble.empty() : OptionalDouble.of(initialY);
@@ -186,6 +280,34 @@ public final class ProjectileMotion {
         double rise = initialVy > 0.0
                 ? finite(0.5 * initialVy * (initialVy / gravity), "maximum height rise") : 0.0;
         return OptionalDouble.of(finite(initialY + rise, "maximum height"));
+    }
+
+    /**
+     * Greatest vertical coordinate reached during actual flight ({@code [0, T]} when a landing
+     * occurs, or {@link #maximumHeight()} otherwise). Distinct from {@link #maximumHeight()}
+     * when the projectile impacts a rising surface before reaching its unconstrained apex.
+     */
+    public OptionalDouble maximumHeightInFlight() {
+        OptionalDouble flight = timeOfFlight();
+        if (flight.isEmpty()) {
+            return maximumHeight();
+        }
+        double duration = flight.getAsDouble();
+        if (duration == 0.0) {
+            return OptionalDouble.of(initialY);
+        }
+        double endY = stateAt(duration).y();
+        double best = Math.max(initialY, endY);
+        if (gravity > 0.0 && initialVy > 0.0) {
+            double apexTime = initialVy / gravity;
+            if (apexTime < duration) {
+                double apexHeight = finite(
+                        Math.fma(0.5 * initialVy, apexTime, initialY),
+                        "maximum height in flight");
+                best = Math.max(best, apexHeight);
+            }
+        }
+        return OptionalDouble.of(best);
     }
 
     public Optional<State> apexState() {
@@ -197,7 +319,230 @@ public final class ProjectileMotion {
     public OptionalDouble horizontalRange() {
         OptionalDouble flightTime = timeOfFlight();
         if (flightTime.isEmpty()) return OptionalDouble.empty();
-        return OptionalDouble.of(finite(initialVx * flightTime.getAsDouble(), "horizontal range"));
+        return OptionalDouble.of(normalizeZero(finite(initialVx * flightTime.getAsDouble(), "horizontal range")));
+    }
+
+    /**
+     * Non-negative distance along the landing surface between the vertical projection of the
+     * launch point and the landing point, or empty when no landing occurs.
+     */
+    public OptionalDouble rangeAlongSurface() {
+        OptionalDouble signed = signedDisplacementAlongSurface();
+        if (signed.isEmpty()) return OptionalDouble.empty();
+        double value = Math.abs(signed.getAsDouble());
+        return OptionalDouble.of(normalizeZero(value));
+    }
+
+    /**
+     * Signed displacement along the landing surface directed toward {@code +x} from the launch
+     * vertical projection to landing, or empty when no landing occurs. Negative values represent
+     * backward landings relative to {@code +x}.
+     */
+    public OptionalDouble signedDisplacementAlongSurface() {
+        OptionalDouble flightTime = timeOfFlight();
+        if (flightTime.isEmpty()) return OptionalDouble.empty();
+        double duration = flightTime.getAsDouble();
+        if (duration == 0.0) return OptionalDouble.of(0.0);
+        double horizontalDisplacement = finite(initialVx * duration, "horizontal displacement to landing");
+        double along = finite(horizontalDisplacement / landingSurface.cosine(), "surface displacement");
+        return OptionalDouble.of(normalizeZero(along));
+    }
+
+    /**
+     * Signed coordinate along the landing surface from {@code landingSurface().anchorX()} to the
+     * landing point, or empty when no landing occurs.
+     */
+    public OptionalDouble signedCoordinateAlongSurfaceFromAnchor() {
+        Optional<State> landing = landingState();
+        if (landing.isEmpty()) return OptionalDouble.empty();
+        return OptionalDouble.of(landingSurface.signedCoordinateFromAnchor(landing.get().x()));
+    }
+
+    /**
+     * Signed perpendicular distance from the landing surface at {@code time}
+     * (positive above the surface, zero on it, negative below it).
+     */
+    public double signedPerpendicularDistanceAt(double time) {
+        State state = stateAt(time);
+        return landingSurface.signedPerpendicularDistance(state.x(), state.y());
+    }
+
+    /**
+     * Exact supremum of signed perpendicular clearance from the landing surface over the physical
+     * flight domain ({@code [0, T]} if landing occurs, {@code [0, infinity)} otherwise).
+     * Returns empty only when clearance grows without bound ({@code g = 0} with positive normal
+     * velocity). Parallel zero-gravity motion and sub-surface flights below an unreachable ceiling
+     * remain bounded and return finite values.
+     */
+    public OptionalDouble maxSignedPerpendicularDistance() {
+        double cosBeta = landingSurface.cosine();
+        double d0 = normalizedInitialPerpendicularDistance();
+        double vPerp0 = normalizedInitialPerpendicularVelocity();
+        double gPerp = finite(gravity * cosBeta, "normal gravity");
+        OptionalDouble flight = timeOfFlight();
+        if (flight.isPresent()) {
+            double duration = flight.getAsDouble();
+            if (duration == 0.0) {
+                return OptionalDouble.of(normalizeZero(d0));
+            }
+            double dEnd = signedPerpendicularDistanceAt(duration);
+            double endScale = perpendicularDistanceScale(stateAt(duration).x(), stateAt(duration).y());
+            double endTolerance = endScale == 0.0 ? 0.0 : SURFACE_ROUNDOFF_ULPS * Math.ulp(endScale);
+            if (Math.abs(dEnd) <= endTolerance) {
+                dEnd = 0.0;
+            }
+            double best = Math.max(d0, dEnd);
+            if (gPerp > 0.0 && vPerp0 > 0.0) {
+                double peakTime = vPerp0 / gPerp;
+                if (peakTime < duration) {
+                    double rise = finite(0.5 * vPerp0 * peakTime, "perpendicular rise");
+                    best = Math.max(best, finite(d0 + rise, "maximum perpendicular distance"));
+                }
+            }
+            return OptionalDouble.of(normalizeZero(best));
+        }
+
+        if (gPerp == 0.0) {
+            if (vPerp0 > 0.0) {
+                return OptionalDouble.empty();
+            }
+            return OptionalDouble.of(normalizeZero(d0));
+        }
+
+        double rise = vPerp0 > 0.0
+                ? finite(0.5 * vPerp0 * (vPerp0 / gPerp), "perpendicular rise")
+                : 0.0;
+        return OptionalDouble.of(normalizeZero(finite(d0 + rise, "maximum perpendicular distance")));
+    }
+
+    /**
+     * Maximum non-negative perpendicular clearance above the landing surface over the physical flight
+     * domain, or empty when clearance is unbounded above the surface ({@code g = 0, v_perp0 > 0})
+     * or when the trajectory remains strictly below the surface without reaching it.
+     */
+    public OptionalDouble maxPerpendicularDistance() {
+        OptionalDouble maxSigned = maxSignedPerpendicularDistance();
+        if (maxSigned.isEmpty() || maxSigned.getAsDouble() < 0.0) {
+            return OptionalDouble.empty();
+        }
+        return OptionalDouble.of(normalizeZero(maxSigned.getAsDouble()));
+    }
+
+    private OptionalDouble timeOfFlightHorizontal(double targetLandingY) {
+        TimeSolutions crossings = timesAtHeight(targetLandingY);
+        if (crossings.infinitelyMany()) {
+            return initialVy <= 0.0 ? OptionalDouble.of(0.0) : OptionalDouble.empty();
+        }
+        if (crossings.times().isEmpty()) return OptionalDouble.empty();
+        if (initialY == targetLandingY && initialVy > 0.0 && gravity == 0.0) {
+            return OptionalDouble.empty();
+        }
+        if (initialY == targetLandingY && initialVy <= 0.0) return OptionalDouble.of(0.0);
+        return crossings.times().stream()
+                .filter(t -> t > 0.0 && isDescendingOrTangentAt(t))
+                .mapToDouble(Double::doubleValue).min();
+    }
+
+    private boolean isDescendingOrTangentAt(double time) {
+        double vy = stateAt(time).vy();
+        double scale = Math.abs(initialVy) + Math.abs(gravity * time);
+        double tolerance = scale == 0.0 ? 0.0 : ROOT_ROUNDOFF_ULPS * Math.ulp(scale);
+        return vy <= tolerance;
+    }
+
+    private OptionalDouble timeOfFlightInclined() {
+        double f0 = normalizedInitialRelativeHeight();
+        double vRel0 = normalizedInitialRelativeVelocity();
+        if (gravity == 0.0) {
+            if (f0 == 0.0) {
+                return vRel0 <= 0.0 ? OptionalDouble.of(0.0) : OptionalDouble.empty();
+            }
+            if (f0 > 0.0) {
+                return vRel0 < 0.0
+                        ? OptionalDouble.of(finite(-f0 / vRel0, "inclined flight time"))
+                        : OptionalDouble.empty();
+            }
+            return timeOfFlightHorizontal(landingSurface.anchorY());
+        }
+
+        if (f0 < 0.0) {
+            return timeOfFlightHorizontal(landingSurface.anchorY());
+        }
+        if (f0 == 0.0) {
+            if (vRel0 <= 0.0) {
+                return OptionalDouble.of(0.0);
+            }
+            return OptionalDouble.of(finite(2.0 * (vRel0 / gravity), "inclined flight time"));
+        }
+
+        double squareTerm = finite(vRel0 * vRel0, "inclined discriminant term");
+        double verticalTerm = finite(2.0 * gravity * f0, "inclined discriminant term");
+        if (!Double.isFinite(verticalTerm) || !Double.isFinite(squareTerm)) {
+            throw numericRange("inclined discriminant");
+        }
+        double discriminant = finite(Math.fma(2.0 * gravity, f0, squareTerm), "inclined discriminant");
+        double root = Math.sqrt(discriminant);
+        double time = vRel0 >= 0.0
+                ? finite((vRel0 + root) / gravity, "inclined flight time")
+                : finite((-2.0 * f0) / (vRel0 - root), "inclined flight time");
+        return OptionalDouble.of(time);
+    }
+
+    private double normalizedInitialRelativeHeight() {
+        double raw = finite(initialY - landingSurface.heightAt(initialX), "initial surface clearance");
+        if (landingSurface.isHorizontal()) {
+            return raw;
+        }
+        double scale = inclineHeightScale(initialX, initialY, landingSurface);
+        double tolerance = scale == 0.0 ? 0.0 : SURFACE_ROUNDOFF_ULPS * Math.ulp(scale);
+        return Math.abs(raw) <= tolerance ? 0.0 : raw;
+    }
+
+    private double normalizedInitialRelativeVelocity() {
+        double slope = landingSurface.slopeTangent();
+        double raw = finite(Math.fma(-initialVx, slope, initialVy), "relative surface velocity");
+        if (landingSurface.isHorizontal()) {
+            return raw;
+        }
+        double scale = Math.abs(initialVy) + Math.abs(initialVx * slope);
+        double tolerance = scale == 0.0 ? 0.0 : ROOT_ROUNDOFF_ULPS * Math.ulp(scale);
+        return Math.abs(raw) <= tolerance ? 0.0 : raw;
+    }
+
+    private double normalizedInitialPerpendicularDistance() {
+        double raw = landingSurface.signedPerpendicularDistance(initialX, initialY);
+        if (landingSurface.isHorizontal()) {
+            return raw;
+        }
+        double scale = perpendicularDistanceScale(initialX, initialY);
+        double tolerance = scale == 0.0 ? 0.0 : SURFACE_ROUNDOFF_ULPS * Math.ulp(scale);
+        return Math.abs(raw) <= tolerance ? 0.0 : raw;
+    }
+
+    private double normalizedInitialPerpendicularVelocity() {
+        double cosBeta = landingSurface.cosine();
+        double sinBeta = landingSurface.sine();
+        double raw = finite(Math.fma(initialVy, cosBeta, -initialVx * sinBeta), "normal surface velocity");
+        if (landingSurface.isHorizontal()) {
+            return raw;
+        }
+        double scale = Math.abs(initialVy * cosBeta) + Math.abs(initialVx * sinBeta);
+        double tolerance = scale == 0.0 ? 0.0 : ROOT_ROUNDOFF_ULPS * Math.ulp(scale);
+        return Math.abs(raw) <= tolerance ? 0.0 : raw;
+    }
+
+    private double perpendicularDistanceScale(double x, double y) {
+        return Math.abs((x - landingSurface.anchorX()) * landingSurface.sine())
+                + Math.abs((y - landingSurface.anchorY()) * landingSurface.cosine());
+    }
+
+    private static double inclineHeightScale(double x, double y, LandingSurface surface) {
+        return Math.abs(y) + Math.abs(surface.anchorY())
+                + Math.abs((x - surface.anchorX()) * surface.slopeTangent());
+    }
+
+    private static double normalizeZero(double value) {
+        return value == 0.0 ? 0.0 : value;
     }
 
     /** All non-negative times at which the projectile reaches a vertical coordinate. */
