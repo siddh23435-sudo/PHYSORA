@@ -1,109 +1,142 @@
 # PHYSORA
 
-A Java-based interactive physics learning, modeling, and simulation platform for Class 11–12 students, particularly those preparing for JEE Main and JEE Advanced.
+A Java-based interactive physics learning, modeling, and simulation platform for Class 11–12 students preparing for JEE Main and JEE Advanced.
 
-## Vision
+## What PHYSORA Does
 
-The platform aims to help students construct physical models, understand governing equations, execute simulations, inspect results, and learn physics through experimentation.
+PHYSORA helps students construct physical models, understand governing equations, execute simulations, inspect results, and learn physics through experimentation. It combines an interactive projectile motion simulator with an AI-assisted problem-solving workflow and a foundational multi-body dynamics engine.
 
-It is intended to evolve beyond static animations and conventional question-solving tools into a unified environment for physical modeling, mathematical reasoning, simulation, and AI-assisted learning.
+## Current Capabilities
 
-## Current Development Milestone
+### Interactive Projectile Motion Normal Bench (Student-Facing)
 
-The foundation is a **Projectile Motion Simulator**. The current development milestone adds a bounded AI-assisted workflow for text-only projectile questions using a multi-tier provider manager (`Gemini`, optional local `Ollama`, and a built-in deterministic rule-based `LocalAIProvider` fallback). The active AI provider interprets the prompt and prepares explanation prose; PHYSORA validates the structured interpretation and obtains all accepted numerical results exclusively from its deterministic projectile solver.
+The desktop application presents a **Normal Bench** workspace with three tabs:
 
-The initial simulator is intended to support:
+- **Simulation** — Animated projectile trajectory visualization with adjustable launch speed, angle, gravity, initial position, and landing height. Play/pause/reset controls, time scrubbing, playback rate, apex and landing markers, and velocity-component vectors. Physics uses positive-up Cartesian coordinates mapped to JavaFX screen-down rendering.
+- **Logic** — Structured equation derivation showing `MathExpression` trees, typed substitutions, intermediate values, and final analytical results from the deterministic `ProjectileProblemSolver`. Supports direct and inverse projectile targets, multipart dependent sequences, and candidate root reporting.
+- **AI Problem** — Submit natural-language projectile questions. An AI provider interprets the problem; PHYSORA validates the interpretation, solves it deterministically, and verifies the explanation. Attribution cards show which provider handled interpretation, explanation, and numerical verification independently. The AI never supplies accepted numerical answers.
 
-- Adjustable launch speed
-- Adjustable launch angle
-- Adjustable gravity
-- Adjustable launch coordinates and landing height
-- Projectile trajectory visualization
-- Position and velocity calculations
-- Time of flight
-- Maximum height
-- Horizontal range
-- Play, pause, and reset controls
-- Automated physics tests
+### AI Provider Architecture
 
-## Technology
+PHYSORA uses a multi-tier provider system with four operating modes:
 
-Java 17 is mandatory. The desktop UI will use JavaFX, and Maven is the build system. Use the checked-in Maven Wrapper (`mvnw.cmd` on Windows or `./mvnw` on macOS/Linux). JUnit is used for automated tests.
+| Mode | Behavior |
+|---|---|
+| `AUTO` (default) | Gemini → optional Ollama → LocalAIProvider |
+| `CLOUD_ONLY` | Gemini only; no silent fallback |
+| `LOCAL_AI` | Optional Ollama → LocalAIProvider; no Gemini |
+| `OFFLINE` | Built-in rule-based LocalAIProvider only; zero network calls |
 
-## Run locally
+Providers are initialized lazily on question submission. No network call or Ollama probe occurs at startup. The built-in `LocalAIProvider` always works offline without any external service.
+
+### Multi-Body Dynamics Engine (Backend Foundation)
+
+The `edu.physics.simulation` package contains a verified headless multi-body constraint engine. This is **engineering infrastructure not yet connected to the interactive application**. It includes:
+
+- 2D rigid body mechanics with symplectic integration
+- Declarative scene composition (`LaboratoryScene`) with bodies, anchors, cables, distance links, revolute joints, and springs
+- Bilateral constraint solving (distance links, revolute joints)
+- Direct cable geometry with endpoint normalization and kinematic evaluation
+- Mass-whitened Delassus RRQR solver with tier classification and redundant-row compatibility
+- Unilateral active-set solver for cable systems with complementarity, velocity gating, and cycle detection
+
+This infrastructure is fully tested but awaits dynamic simulation integration (Stage 3C-2A.4) and UI connection before it becomes a student-facing feature.
+
+## Technology Stack
+
+| Component | Technology |
+|---|---|
+| Language | Java 17 (mandatory) |
+| Desktop UI | JavaFX 21 |
+| Build system | Maven (use the checked-in Maven Wrapper) |
+| Testing | JUnit 5 |
+| Coverage | JaCoCo |
+| AI (cloud) | Google Gemini via official GenAI Java SDK (optional) |
+| AI (local) | Ollama (optional, disabled by default) |
+
+## Getting Started
+
+### Prerequisites
+
+- Java 17 JDK
+- No other dependencies required for basic usage
+
+### Run the application
 
 ```powershell
 .\mvnw.cmd javafx:run
 ```
 
-Run the tests and package the project with:
+On macOS/Linux:
+```bash
+./mvnw javafx:run
+```
 
+### Run the tests
+
+```powershell
+.\mvnw.cmd test
+```
+
+Run tests with coverage report:
 ```powershell
 .\mvnw.cmd clean verify
 ```
 
-## Project Status
+Coverage report: `target/site/jacoco/index.html`
 
-The project is being developed incrementally.
+### AI Provider Configuration (Optional)
 
-The Phase 1 foundation includes an analytical projectile model, a JavaFX simulator, and a presentation-independent projectile problem solver with structured equation expressions. Phase 2 adds a constrained multi-provider AI question workflow (`AIProviderManager` across cloud Gemini, optional local Ollama, and built-in `LocalAIProvider` fallback) plus mode controls and per-stage attribution transparency in the `AI PROBLEM` tab. JaCoCo coverage is generated during `clean verify`. See `docs/PHASE1_TRACEABILITY.md` and `docs/PHASE2_TRACEABILITY.md` for tested capabilities and remaining live runtime verification items. A passing Maven build is not by itself a claim that all live provider or desktop acceptance checks are complete.
+PHYSORA does **not** require Ollama or a Gemini API key to launch or solve problems offline.
 
-Additional physics chapters, model composition, and advanced learning features remain planned for later milestones.
+**Environment variables:**
 
-## AI Provider Configuration (Phase 2)
+- `PHYSORA_AI_MODE` — `AUTO` (default), `CLOUD_ONLY`, `LOCAL_AI`, `OFFLINE`
+- `GOOGLE_API_KEY` — Required for Gemini; set in local environment (never commit)
+- `PHYSORA_GEMINI_MODEL` — Default `gemini-3.1-flash-lite`
+- `PHYSORA_OLLAMA_ENABLED` — `true` or `false` (default `false`)
+- `PHYSORA_OLLAMA_URL` — Default `http://127.0.0.1:11434`
+- `PHYSORA_OLLAMA_MODEL` — Default `qwen-physics-test`
+- `PHYSORA_AI_TIMEOUT_SECONDS` — Default `45`
+- `PHYSORA_AI_MAX_ATTEMPTS` — Default `3` (range 1–5)
+- `PHYSORA_AI_MAX_QUESTION_CHARS` — Default `12000`
+- `PHYSORA_AI_MAX_OUTPUT_TOKENS` — Default `3000` (range 128–16384)
 
-PHYSORA does **not** require Ollama to be installed or a Gemini API key just to launch or solve problems offline. Provider construction happens lazily when a student submits a question, with zero startup probes.
+## Test Baseline
 
-### Operating Modes (`PHYSORA_AI_MODE` or UI Mode Selector)
+**367 automated tests**, all passing. Verified on `feature/physora-48hr-demo` at commit `f112909` (2026-11-15).
 
-- `AUTO` *(default)* — Tries Google Gemini (if `GOOGLE_API_KEY` is set), then optional Ollama (only if enabled), and otherwise falls back to the built-in deterministic rule-based `LocalAIProvider`.
-- `CLOUD_ONLY` — Uses Google Gemini exclusively (`GOOGLE_API_KEY` required). Never falls back silently to Ollama or `LocalAIProvider`.
-- `LOCAL_AI` — Uses optional local Ollama (when enabled) with fallback to `LocalAIProvider`. Never sends requests to Google Gemini.
-- `OFFLINE` — Uses only the built-in rule-based `LocalAIProvider` with zero network calls.
+| Phase | Scope | Approximate Tests |
+|---|---|---|
+| Phase 1 | Projectile model, problem solver, UI controls | ~76 |
+| Phase 2 | AI workflow, providers, validation, UI tab | ~124 |
+| Phase 3 | Multi-body simulation, constraints, geometry | ~127 |
+| **Total** | | **367** |
 
-### Environment Variables and Defaults
-
-- **Routing & mode**:
-  - `PHYSORA_AI_MODE` (default `AUTO`; accepts `AUTO`, `CLOUD_ONLY`, `LOCAL_AI`, `OFFLINE`, plus aliases `CLOUD`, `GEMINI`, `LOCAL_LLM`, `OLLAMA`, `LOCAL`, `RULE_BASED`)
-  - `PHYSORA_AI_PROVIDER` (legacy fallback when `PHYSORA_AI_MODE` is unset/blank: `gemini` -> `AUTO`, `local` -> `OFFLINE`)
-  - `PHYSORA_OLLAMA_ENABLED` (`true` or `false`, default `false`; Ollama is strictly opt-in)
-- **Google Gemini (cloud, optional)**:
-  - `GOOGLE_API_KEY` (set in local environment before launching; never commit API keys or display them in UI)
-  - `PHYSORA_GEMINI_MODEL` (default `gemini-3.1-flash-lite`)
-  - `PHYSORA_AI_TIMEOUT_SECONDS` (default `45`, positive integer)
-  - `PHYSORA_AI_MAX_ATTEMPTS` (default `3`, range `1`–`5`)
-  - `PHYSORA_AI_MAX_QUESTION_CHARS` (default `12000`, range `1`–`100000`)
-  - `PHYSORA_AI_MAX_OUTPUT_TOKENS` (default `3000`, range `128`–`16384`)
-- **Ollama (local LLM, optional)**:
-  - `PHYSORA_OLLAMA_URL` (default `http://127.0.0.1:11434`)
-  - `PHYSORA_OLLAMA_MODEL` (default `qwen-physics-test`; matched strictly against exact tag or `:latest` without silent model substitution)
-  - `PHYSORA_OLLAMA_TIMEOUT_SECONDS` (default `45`; health probe timeout is `500 ms` on demand only)
-
-Network access occurs only when submitting a question in a network-enabled mode (`AUTO` with Gemini/Ollama, `CLOUD_ONLY`, or enabled `LOCAL_AI`). In the UI, the **VERIFIED SOLUTION** panel displays independent attribution for **Problem Interpretation**, **Solution Explanation** (including ordered fallback hops and sanitized reasons), and **Numerical Verification** (`PHYSORA Deterministic Physics Solver`). The current desktop app reads local credentials directly; a distributed public release should place provider credentials behind a trusted server boundary.
+Note: Some tests cross-cut phase boundaries. The authoritative total is from `.\mvnw.cmd test`.
 
 ## Development Principles
 
-- Correct physics before visual polish.
-- Keep the physics model separate from the UI.
-- Test calculations against analytical results.
-- Avoid unnecessary dependencies.
-- Build working milestones before generalizing the architecture.
-- Keep the student involved in important technical decisions.
+- Correct physics before visual polish
+- Physics model independent of UI rendering
+- Test calculations against analytical results
+- Avoid unnecessary dependencies
+- Build working milestones before generalizing
+- AI interprets and explains; the deterministic solver calculates
 
 ## Project Documentation
 
-- `AGENTS.md` — coding agent instructions
-- `CLAUDE.md` — Claude Code instructions
-- `docs/PROJECT_CONTEXT.md` — physics scope and long-term architecture
-- `docs/PROJECT_GOAL.md` — academic evaluation goals, product quality bar, and design direction
-- `docs/ARCHITECTURE.md` — current implementation structure and runtime flow
-- `docs/PHASE1_TRACEABILITY.md` — Phase 1 requirement status and test mapping
-- `docs/PHASE2_TRACEABILITY.md` — Phase 2 AI workflow status and test mapping
+| Document | Purpose |
+|---|---|
+| `AGENTS.md` | Coding agent instructions and project rules |
+| `CLAUDE.md` | Claude Code instructions |
+| `docs/PROJECT_CONTEXT.md` | Physics scope and long-term architecture |
+| `docs/PROJECT_GOAL.md` | Academic evaluation goals and product direction |
+| `docs/ARCHITECTURE.md` | Current implementation structure and runtime flow |
+| `docs/PHASE1_TRACEABILITY.md` | Phase 1 requirement status and test mapping |
+| `docs/PHASE2_TRACEABILITY.md` | Phase 2 AI workflow status and test mapping |
+| `docs/PHASE3_TRACEABILITY.md` | Phase 3 multi-body constraint engine traceability |
 
 ## License
 
 The project license has not yet been finalized.
-
-
-
-
