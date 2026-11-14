@@ -1034,7 +1034,12 @@ public final class ConstraintCompletenessValidator {
             PhysicalQuantity draftQty = entry.getValue();
             if (isSharedCanonicalInput(input)) {
                 if (!sharedInputMatchesCanonical(input, draftQty, canonical)) {
-                    return false;
+                    PhysicalQuantity canonQty = canonicalPart.parameters().get(input);
+                    if (canonQty == null
+                            || canonQty.unit().dimension() != draftQty.unit().dimension()
+                            || !nearlyEqual(draftQty.valueInSi(), canonQty.valueInSi())) {
+                        return false;
+                    }
                 }
             } else {
                 PhysicalQuantity canonQty = canonicalPart.parameters().get(input);
@@ -1055,7 +1060,14 @@ public final class ConstraintCompletenessValidator {
         draftPart.givens().forEach((input, draftQty) -> {
             if (isSharedCanonicalInput(input)) {
                 if (!sharedInputMatchesCanonical(input, draftQty, canonical)) {
-                    invalidDiagnostics.add("canonical-given-parameter-mismatch:" + input.name());
+                    PhysicalQuantity canonicalQty = canonicalPart.parameters().get(input);
+                    if (canonicalQty == null) {
+                        invalidDiagnostics.add("canonical-given-parameter-mismatch:" + input.name());
+                    } else if (canonicalQty.unit().dimension() != draftQty.unit().dimension()
+                            || !nearlyEqual(draftQty.valueInSi(), canonicalQty.valueInSi())) {
+                        invalidDiagnostics.add("canonical-target-parameter-mismatch:"
+                                + draftPart.target().name() + ":" + input.name());
+                    }
                 }
                 return;
             }
@@ -2022,6 +2034,7 @@ public final class ConstraintCompletenessValidator {
     private static boolean isIntroducedDefault(String assumption) {
         if (assumption == null) return false;
         return assumption.contains("-defaulted-")
+                || assumption.contains("PHYSORA_DEFAULT")
                 || assumption.equals("launch-angle-normalized-from-incline-surface-to-horizontal");
     }
 

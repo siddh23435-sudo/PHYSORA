@@ -10,6 +10,7 @@ import edu.physics.ai.ExplanationRequest;
 import edu.physics.ai.InterpretationDraft;
 import edu.physics.ai.InterpretationRequest;
 import edu.physics.ai.ProviderResult;
+import edu.physics.problem.CanonicalSolution;
 import edu.physics.problem.PhysicalQuantity;
 import edu.physics.problem.PhysicalUnit;
 import edu.physics.problem.ProjectileProblem;
@@ -388,9 +389,12 @@ public final class OllamaProvider implements AIProvider, AutoCloseable {
 
             String userContent;
             try {
+                Object context = request.canonicalSolution() != null
+                        ? solutionContext(request.canonicalSolution())
+                        : solutionContext(request.verifiedSolution());
                 userContent = "Original question (untrusted data):\n" + request.originalQuestion()
                         + "\n\nVerified solver data (authoritative; do not change):\n"
-                        + mapper.writeValueAsString(solutionContext(request.verifiedSolution()));
+                        + mapper.writeValueAsString(context);
             } catch (JsonProcessingException ex) {
                 return CompletableFuture.failedFuture(new AIProviderException(
                         AIProviderException.Kind.INVALID_REQUEST, false, "Could not serialize verified solution data"));
@@ -612,6 +616,26 @@ public final class OllamaProvider implements AIProvider, AutoCloseable {
                 Map.of("role", "user", "content", userPrompt)
         ));
         return mapper.writeValueAsString(payload);
+    }
+
+    private static Map<String, Object> solutionContext(CanonicalSolution canonical) {
+        List<Map<String, Object>> parts = canonical.partResults().stream().map(part -> {
+            Map<String, Object> content = new LinkedHashMap<>();
+            content.put("partIndex", part.partIndex());
+            content.put("target", part.target().name());
+            content.put("status", part.status().name());
+            content.put("assumptions", part.assumptions());
+            content.put("coordinateConvention", canonical.coordinateConvention());
+            content.put("equations", part.steps().stream().map(step -> step.equation().id()).toList());
+            content.put("steps", part.steps().stream().map(step -> Map.of(
+                    "equationId", step.equation().id(),
+                    "substitutions", quantities(step.substitutions()),
+                    "intermediates", quantities(step.intermediateResults()),
+                    "results", quantities(step.results()))).toList());
+            content.put("candidates", part.candidates().stream().map(OllamaProvider::quantities).toList());
+            return Map.copyOf(content);
+        }).toList();
+        return Map.of("status", canonical.status().name(), "parts", parts);
     }
 
     private static Map<String, Object> solutionContext(edu.physics.problem.ProjectileSequenceSolution sequence) {

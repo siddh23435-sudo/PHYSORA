@@ -224,6 +224,38 @@ class PhysicsCapabilityRegistryTest {
         assertTrue(eval.unsupportedReasons().contains("unknown-unmapped-constraint:quantum-tunneling"));
     }
 
+    @Test
+    void supportsDependentMultipartSequenceWhereReferencesSatisfyInputs() {
+        // Part 0 is FIND_INITIAL_SPEED; Part 1 is HORIZONTAL_RANGE referencing Part 0's initialSpeed.
+        CanonicalPhysicsProblem problem = CanonicalPhysicsProblem.builder("Dependent multipart sequence")
+                .polarVelocity(null, q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(9.81, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(CanonicalPhysicsProblem.target(Target.FIND_INITIAL_SPEED), Map.of(
+                        Input.HORIZONTAL_DISPLACEMENT, q(10.0, PhysicalUnit.METRE),
+                        Input.VERTICAL_DISPLACEMENT, q(0.0, PhysicalUnit.METRE)))
+                .addTarget(CanonicalPhysicsProblem.target(Target.HORIZONTAL_RANGE), Map.of(), Map.of(
+                        Input.INITIAL_SPEED, new ProjectileProblemSequence.ResultReference(0, "initialSpeed")))
+                .build();
+
+        PhysicsCapabilityRegistry.CapabilityEvaluation eval = registry.evaluate(problem);
+        assertEquals(SupportStatus.SUPPORTED, eval.status());
+        assertEquals(2, eval.targetAssessments().size());
+        assertEquals(SupportStatus.SUPPORTED, eval.targetAssessments().get(0).status());
+        assertEquals(SupportStatus.SUPPORTED, eval.targetAssessments().get(1).status());
+        assertTrue(eval.targetAssessments().get(1).missingInputs().isEmpty());
+
+        // Forward/self dependency reference triggers INVALID_INPUT
+        CanonicalPhysicsProblem invalidRefProblem = CanonicalPhysicsProblem.builder("Invalid ref structure")
+                .polarVelocity(q(20.0, PhysicalUnit.METRE_PER_SECOND), q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(9.81, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(CanonicalPhysicsProblem.target(Target.POSITION_AT_TIME), Map.of(), Map.of(
+                        Input.TIME, new ProjectileProblemSequence.ResultReference(0, "time")))
+                .build();
+        PhysicsCapabilityRegistry.CapabilityEvaluation invalidEval = registry.evaluate(invalidRefProblem);
+        assertEquals(SupportStatus.INVALID_INPUT, invalidEval.status());
+        assertTrue(invalidEval.invalidDiagnostics().contains("invalid-dependency-reference:TIME"));
+    }
+
     private static PhysicalQuantity q(double value, PhysicalUnit unit) {
         return new PhysicalQuantity(value, unit);
     }

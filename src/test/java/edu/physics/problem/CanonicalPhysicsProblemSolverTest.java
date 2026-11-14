@@ -1,5 +1,6 @@
 package edu.physics.problem;
 
+import edu.physics.problem.ProjectileProblemSequence.ResultReference;
 import edu.physics.projectile.LandingSurface;
 import edu.physics.projectile.ProjectileMotion;
 import org.junit.jupiter.api.Test;
@@ -575,6 +576,286 @@ class CanonicalPhysicsProblemSolverTest {
         assertEquals(PartStatus.SOLVED, mixedInvalidSol.resultFor(CanonicalPhysicsProblem.target(Target.HORIZONTAL_RANGE)).orElseThrow().status());
         assertEquals(40.0, valueOf(mixedInvalidSol, CanonicalPhysicsProblem.target(Target.HORIZONTAL_RANGE), "range"), TOL);
         assertEquals(PartStatus.INVALID_INPUT, mixedInvalidSol.resultFor(CanonicalPhysicsProblem.target(Target.POSITION_AT_TIME)).orElseThrow().status());
+    }
+
+    @Test
+    void solvesDependentMultiPartProblemWithInitialSpeedReference() {
+        // Part 0: FIND_INITIAL_SPEED with angle=45°, dx=10.0 m, dy=0.0 m, g=9.8
+        // Part 1: HORIZONTAL_RANGE with INITIAL_SPEED referencing Part 0 "initialSpeed"
+        CanonicalPhysicsProblem problem = CanonicalPhysicsProblem.builder("Solve initial speed then find range")
+                .polarVelocity(null, q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(9.8, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(CanonicalPhysicsProblem.target(Target.FIND_INITIAL_SPEED), Map.of(
+                        Input.HORIZONTAL_DISPLACEMENT, q(10.0, PhysicalUnit.METRE),
+                        Input.VERTICAL_DISPLACEMENT, q(0.0, PhysicalUnit.METRE)))
+                .addTarget(CanonicalPhysicsProblem.target(Target.HORIZONTAL_RANGE), Map.of(), Map.of(
+                        Input.INITIAL_SPEED, new ResultReference(0, "initialSpeed")))
+                .build();
+
+        CanonicalSolution solution = solver.solveCanonical(problem);
+        assertEquals(OverallStatus.SOLVED, solution.status());
+        assertEquals(2, solution.partResults().size());
+        assertEquals(PartStatus.SOLVED, solution.partResults().get(0).status());
+        assertEquals(PartStatus.SOLVED, solution.partResults().get(1).status());
+        double speed = solution.partResults().get(0).candidates().get(0).get("initialSpeed").valueInSi();
+        assertEquals(Math.sqrt(98.0), speed, TOL);
+        double range = solution.partResults().get(1).candidates().get(0).get("range").valueInSi();
+        assertEquals(10.0, range, TOL);
+    }
+
+    @Test
+    void solvesDependentMultiPartProblemWithFlightTimeReference() {
+        // Part 0: FLIGHT_TIME with v0=20 m/s, angle=45°, g=10.0
+        // Part 1: POSITION_AT_TIME with TIME referencing Part 0 "flightTime"
+        CanonicalPhysicsProblem problem = CanonicalPhysicsProblem.builder("Flight time then position at landing")
+                .polarVelocity(q(20.0, PhysicalUnit.METRE_PER_SECOND), q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(10.0, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(Target.FLIGHT_TIME)
+                .addTarget(CanonicalPhysicsProblem.target(Target.POSITION_AT_TIME), Map.of(), Map.of(
+                        Input.TIME, new ResultReference(0, "flightTime")))
+                .build();
+
+        CanonicalSolution solution = solver.solveCanonical(problem);
+        assertEquals(OverallStatus.SOLVED, solution.status());
+        assertEquals(PartStatus.SOLVED, solution.partResults().get(0).status());
+        assertEquals(PartStatus.SOLVED, solution.partResults().get(1).status());
+        double tFlight = solution.partResults().get(0).candidates().get(0).get("flightTime").valueInSi();
+        assertEquals(2.0 * 20.0 * Math.sin(Math.toRadians(45.0)) / 10.0, tFlight, TOL);
+        double yPos = solution.partResults().get(1).candidates().get(0).get("y").valueInSi();
+        assertEquals(0.0, yPos, TOL);
+    }
+
+    @Test
+    void handlesMultipleSolutionsUpstreamAsDependencyUnavailable() {
+        // Part 0: FIND_LAUNCH_ANGLE that has multiple solutions
+        // Part 1: FLIGHT_TIME referencing Part 0 "launchAngle"
+        CanonicalPhysicsProblem problem = CanonicalPhysicsProblem.builder("Multiple roots upstream")
+                .polarVelocity(q(20.0, PhysicalUnit.METRE_PER_SECOND), null)
+                .gravity(q(9.8, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(CanonicalPhysicsProblem.target(Target.FIND_LAUNCH_ANGLE), Map.of(
+                        Input.HORIZONTAL_DISPLACEMENT, q(10.0, PhysicalUnit.METRE),
+                        Input.VERTICAL_DISPLACEMENT, q(2.0, PhysicalUnit.METRE)))
+                .addTarget(CanonicalPhysicsProblem.target(Target.FLIGHT_TIME), Map.of(), Map.of(
+                        Input.LAUNCH_ANGLE, new ResultReference(0, "launchAngle")))
+                .build();
+
+        CanonicalSolution solution = solver.solveCanonical(problem);
+        assertEquals(OverallStatus.PARTIALLY_SOLVED, solution.status());
+        assertEquals(PartStatus.MULTIPLE_SOLUTIONS, solution.partResults().get(0).status());
+        assertEquals(2, solution.partResults().get(0).candidates().size());
+        assertEquals(PartStatus.DEPENDENCY_UNAVAILABLE, solution.partResults().get(1).status());
+        assertTrue(solution.partResults().get(1).diagnostics().contains("upstream-part-not-uniquely-solved:0"));
+    }
+
+    @Test
+    void handlesUpstreamFailureAndMissingQuantityAsDependencyUnavailable() {
+        // Target requiring unreachable point -> NO_SOLUTION upstream
+        CanonicalPhysicsProblem unreachable = CanonicalPhysicsProblem.builder("Unreachable point upstream")
+                .polarVelocity(q(5.0, PhysicalUnit.METRE_PER_SECOND), null)
+                .gravity(q(9.8, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(CanonicalPhysicsProblem.target(Target.FIND_LAUNCH_ANGLE), Map.of(
+                        Input.HORIZONTAL_DISPLACEMENT, q(100.0, PhysicalUnit.METRE),
+                        Input.VERTICAL_DISPLACEMENT, q(10.0, PhysicalUnit.METRE)))
+                .addTarget(CanonicalPhysicsProblem.target(Target.FLIGHT_TIME), Map.of(), Map.of(
+                        Input.LAUNCH_ANGLE, new ResultReference(0, "launchAngle")))
+                .build();
+        CanonicalSolution unreachSol = solver.solveCanonical(unreachable);
+        assertEquals(OverallStatus.NO_UNIFIED_SOLUTION, unreachSol.status());
+        assertEquals(PartStatus.NO_SOLUTION, unreachSol.partResults().get(0).status());
+        assertEquals(PartStatus.DEPENDENCY_UNAVAILABLE, unreachSol.partResults().get(1).status());
+
+        // Referencing non-existent quantity
+        CanonicalPhysicsProblem badKey = CanonicalPhysicsProblem.builder("Missing quantity name")
+                .polarVelocity(q(20.0, PhysicalUnit.METRE_PER_SECOND), q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(10.0, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(Target.FLIGHT_TIME)
+                .addTarget(CanonicalPhysicsProblem.target(Target.POSITION_AT_TIME), Map.of(), Map.of(
+                        Input.TIME, new ResultReference(0, "nonExistentKey")))
+                .build();
+        CanonicalSolution badKeySol = solver.solveCanonical(badKey);
+        assertEquals(OverallStatus.PARTIALLY_SOLVED, badKeySol.status());
+        assertEquals(PartStatus.SOLVED, badKeySol.partResults().get(0).status());
+        assertEquals(PartStatus.DEPENDENCY_UNAVAILABLE, badKeySol.partResults().get(1).status());
+        assertTrue(badKeySol.partResults().get(1).diagnostics().contains("referenced-result-not-found:nonExistentKey"));
+    }
+
+    @Test
+    void rejectsSelfForwardAndConflictingReferencesAtBuildAndEvaluation() {
+        // 1. Negative reference index: rejected at reference construction with IllegalArgumentException
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> new ResultReference(-1, "time"));
+        assertTrue(ex.getMessage().contains("Referenced part index must be non-negative"));
+
+        // 2. Self reference: Part 0 references Part 0
+        CanonicalPhysicsProblem selfRef = CanonicalPhysicsProblem.builder("Self reference")
+                .polarVelocity(q(20.0, PhysicalUnit.METRE_PER_SECOND), q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(10.0, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(CanonicalPhysicsProblem.target(Target.POSITION_AT_TIME), Map.of(), Map.of(
+                        Input.TIME, new ResultReference(0, "time")))
+                .build();
+        assertFalse(selfRef.isValidForEvaluation());
+        assertTrue(selfRef.validationErrors().contains("invalid-dependency-reference:TIME"));
+        CanonicalSolution selfSol = solver.solveCanonical(selfRef);
+        assertEquals(OverallStatus.INVALID_INPUT, selfSol.status());
+        assertEquals(PartStatus.INVALID_INPUT, selfSol.partResults().get(0).status());
+        assertTrue(selfSol.partResults().get(0).diagnostics().contains("invalid-dependency-reference:TIME"));
+
+        // 3. Forward reference: Part 0 references Part 1
+        CanonicalPhysicsProblem fwdRef = CanonicalPhysicsProblem.builder("Forward reference")
+                .polarVelocity(q(20.0, PhysicalUnit.METRE_PER_SECOND), q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(10.0, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(CanonicalPhysicsProblem.target(Target.POSITION_AT_TIME), Map.of(), Map.of(
+                        Input.TIME, new ResultReference(1, "time")))
+                .addTarget(Target.FLIGHT_TIME)
+                .build();
+        assertFalse(fwdRef.isValidForEvaluation());
+        assertTrue(fwdRef.validationErrors().contains("invalid-dependency-reference:TIME"));
+        CanonicalSolution fwdSol = solver.solveCanonical(fwdRef);
+        assertEquals(OverallStatus.INVALID_INPUT, fwdSol.status());
+        assertEquals(PartStatus.INVALID_INPUT, fwdSol.partResults().get(0).status());
+        assertTrue(fwdSol.partResults().get(0).diagnostics().contains("invalid-dependency-reference:TIME"));
+
+        // 4. Conflicting input definition: same part defines parameter TIME and reference TIME
+        CanonicalPhysicsProblem conflictParam = CanonicalPhysicsProblem.builder("Conflicting param and reference")
+                .polarVelocity(q(20.0, PhysicalUnit.METRE_PER_SECOND), q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(10.0, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(Target.FLIGHT_TIME)
+                .addTarget(CanonicalPhysicsProblem.target(Target.POSITION_AT_TIME),
+                        Map.of(Input.TIME, q(2.0, PhysicalUnit.SECOND)),
+                        Map.of(Input.TIME, new ResultReference(0, "flightTime")))
+                .build();
+        assertFalse(conflictParam.isValidForEvaluation());
+        assertTrue(conflictParam.validationErrors().contains("conflicting-input-definition:TIME"));
+        CanonicalSolution conflictParamSol = solver.solveCanonical(conflictParam);
+        assertEquals(OverallStatus.INVALID_INPUT, conflictParamSol.status());
+        assertEquals(PartStatus.INVALID_INPUT, conflictParamSol.partResults().get(1).status());
+        assertTrue(conflictParamSol.partResults().get(1).diagnostics().contains("conflicting-input-definition:TIME"));
+
+        // 5. Conflict with canonical problem level input: problem sets polar speed, part 1 references INITIAL_SPEED
+        CanonicalPhysicsProblem conflictProblemLevel = CanonicalPhysicsProblem.builder("Conflict with canonical speed")
+                .polarVelocity(q(20.0, PhysicalUnit.METRE_PER_SECOND), q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(10.0, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(Target.FLIGHT_TIME)
+                .addTarget(CanonicalPhysicsProblem.target(Target.HORIZONTAL_RANGE), Map.of(), Map.of(
+                        Input.INITIAL_SPEED, new ResultReference(0, "flightTime")))
+                .build();
+        assertFalse(conflictProblemLevel.isValidForEvaluation());
+        assertTrue(conflictProblemLevel.validationErrors().contains("conflicting-input-definition:INITIAL_SPEED"));
+        CanonicalSolution conflictProblemSol = solver.solveCanonical(conflictProblemLevel);
+        assertEquals(OverallStatus.INVALID_INPUT, conflictProblemSol.status());
+        assertEquals(PartStatus.INVALID_INPUT, conflictProblemSol.partResults().get(1).status());
+        assertTrue(conflictProblemSol.partResults().get(1).diagnostics().contains("conflicting-input-definition:INITIAL_SPEED"));
+    }
+
+    @Test
+    void solvesIndependentSiblingPartWhenEarlierDependencyChainFails() {
+        // Physical setup:
+        // Canonical problem defines launch angle = 45 degrees, g = 10 m/s^2, flat landing at y = 0.
+        // Part 0 (inverse): FIND_INITIAL_SPEED to hit (dx = 10 m, dy = 20 m).
+        // Physics justification: Launch angle is 45 deg, so launch line is y = x.
+        // Because gravity curves trajectories strictly downward, y(x) < x for all positive x and real v0.
+        // A target at (10, 20) requires curving upward (y > x), which is physically impossible under gravity.
+        // Therefore, Part 0 produces NO_SOLUTION.
+        //
+        // Part 1 (dependent): HORIZONTAL_RANGE with INITIAL_SPEED referencing Part 0 "initialSpeed".
+        // Since Part 0 produces NO_SOLUTION, Part 1 cannot resolve initialSpeed -> DEPENDENCY_UNAVAILABLE.
+        //
+        // Part 2 (independent sibling): HORIZONTAL_RANGE with its own initialSpeed = 20 m/s in parameters,
+        // using problem-level angle = 45 deg, g = 10 m/s^2.
+        // Analytical result: R = v0^2 * sin(2*theta) / g = 20^2 * sin(90 deg) / 10 = 40.0 m.
+        // Part 2 must genuinely evaluate and solve to R = 40.0 m.
+        //
+        // Overall status: Part 0 is NO_SOLUTION, Part 1 is DEPENDENCY_UNAVAILABLE, Part 2 is SOLVED.
+        // With at least one part solved and not all solved, overall status must be PARTIALLY_SOLVED.
+        CanonicalPhysicsProblem problem = CanonicalPhysicsProblem.builder("Independent sibling evaluation")
+                .polarVelocity(null, q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(10.0, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .horizontalLandingY(q(0.0, PhysicalUnit.METRE))
+                .addTarget(CanonicalPhysicsProblem.target(Target.FIND_INITIAL_SPEED), Map.of(
+                        Input.HORIZONTAL_DISPLACEMENT, q(10.0, PhysicalUnit.METRE),
+                        Input.VERTICAL_DISPLACEMENT, q(20.0, PhysicalUnit.METRE)))
+                .addTarget(CanonicalPhysicsProblem.target(Target.HORIZONTAL_RANGE), Map.of(), Map.of(
+                        Input.INITIAL_SPEED, new ResultReference(0, "initialSpeed")))
+                .addTarget(CanonicalPhysicsProblem.target(Target.HORIZONTAL_RANGE), Map.of(
+                        Input.INITIAL_SPEED, q(20.0, PhysicalUnit.METRE_PER_SECOND)))
+                .build();
+
+        assertTrue(problem.isValidForEvaluation());
+        assertEquals(3, problem.parts().size());
+
+        CanonicalSolution solution = solver.solveCanonical(problem);
+
+        assertEquals(OverallStatus.PARTIALLY_SOLVED, solution.status());
+        assertEquals(3, solution.partResults().size());
+
+        // Part 0 assertions: inverse query failed with NO_SOLUTION
+        CanonicalSolution.PartResult part0 = solution.partResults().get(0);
+        assertEquals(PartStatus.NO_SOLUTION, part0.status());
+        assertTrue(part0.candidates().isEmpty());
+
+        // Part 1 assertions: dependent part failed with DEPENDENCY_UNAVAILABLE
+        CanonicalSolution.PartResult part1 = solution.partResults().get(1);
+        assertEquals(PartStatus.DEPENDENCY_UNAVAILABLE, part1.status());
+        assertTrue(part1.candidates().isEmpty());
+        assertTrue(part1.diagnostics().contains("upstream-part-not-uniquely-solved:0"));
+
+        // Part 2 assertions: independent sibling genuinely evaluated and SOLVED
+        CanonicalSolution.PartResult part2 = solution.partResults().get(2);
+        assertEquals(PartStatus.SOLVED, part2.status());
+        assertEquals(1, part2.candidates().size());
+        assertEquals(40.0, part2.candidates().get(0).get("range").valueInSi(), TOL);
+        assertEquals(PhysicalUnit.METRE, part2.candidates().get(0).get("range").unit());
+
+        // Prove Part 2 was genuinely calculated via forward kinematic step, not merely flagged
+        assertFalse(part2.steps().isEmpty());
+        assertEquals("range-from-landing-time", part2.steps().get(0).equationId());
+        assertTrue(part2.requiredQuantities().contains("range"));
+        assertTrue(part2.assumptions().contains("constant-downward-gravity"));
+    }
+
+    @Test
+    void rejectsIncompatibleUnitReference() {
+        // Part 0 produces flightTime (TIME dimension)
+        // Part 1 references it for TARGET_Y (LENGTH dimension)
+        CanonicalPhysicsProblem problem = CanonicalPhysicsProblem.builder("Dimension mismatch in reference")
+                .polarVelocity(q(20.0, PhysicalUnit.METRE_PER_SECOND), q(45.0, PhysicalUnit.DEGREE))
+                .gravity(q(10.0, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .addTarget(Target.FLIGHT_TIME)
+                .addTarget(CanonicalPhysicsProblem.target(Target.POSITION_AT_HEIGHT), Map.of(), Map.of(
+                        Input.TARGET_Y, new ResultReference(0, "flightTime")))
+                .build();
+
+        CanonicalSolution solution = solver.solveCanonical(problem);
+        assertEquals(OverallStatus.INVALID_INPUT, solution.status());
+        assertEquals(PartStatus.SOLVED, solution.partResults().get(0).status());
+        assertEquals(PartStatus.INVALID_INPUT, solution.partResults().get(1).status());
+        assertTrue(solution.partResults().get(1).diagnostics().contains("incompatible-unit:TARGET_Y"));
+    }
+
+    @Test
+    void solvesDependentMultiPartSequenceOnInclinedLandingSurface() {
+        // Incline with angle=30°. Launch at 45° horizontal (15° relative to incline), g=9.8
+        // Part 0: FIND_INITIAL_SPEED to hit (dx=10, dy=0)
+        // Part 1: RANGE_ALONG_SURFACE on the incline using resolved speed!
+        CanonicalPhysicsProblem problem = CanonicalPhysicsProblem.builder("Incline dependent sequence")
+                .polarVelocity(null, q(15.0, PhysicalUnit.DEGREE), AngleReference.INCLINE_SURFACE)
+                .gravity(q(9.8, PhysicalUnit.METRE_PER_SECOND_SQUARED))
+                .landingSurface(LandingSurface.incline(0.0, 0.0, 30.0))
+                .addTarget(CanonicalPhysicsProblem.target(Target.FIND_INITIAL_SPEED), Map.of(
+                        Input.HORIZONTAL_DISPLACEMENT, q(10.0, PhysicalUnit.METRE),
+                        Input.VERTICAL_DISPLACEMENT, q(0.0, PhysicalUnit.METRE)))
+                .addTarget(SurfaceTarget.RANGE_ALONG_SURFACE, Map.of(), Map.of(
+                        Input.INITIAL_SPEED, new ResultReference(0, "initialSpeed")))
+                .build();
+
+        CanonicalSolution solution = solver.solveCanonical(problem);
+        assertEquals(OverallStatus.SOLVED, solution.status());
+        assertEquals(PartStatus.SOLVED, solution.partResults().get(0).status());
+        assertEquals(PartStatus.SOLVED, solution.partResults().get(1).status());
+        double speed = solution.partResults().get(0).candidates().get(0).get("initialSpeed").valueInSi();
+        assertEquals(Math.sqrt(98.0), speed, TOL);
+        double rangeAlong = solution.partResults().get(1).candidates().get(0).get("rangeAlongSurface").valueInSi();
+        assertTrue(rangeAlong > 0.0);
     }
 
     private static double valueOf(CanonicalSolution solution, CanonicalPhysicsProblem.CanonicalTarget target, String key) {

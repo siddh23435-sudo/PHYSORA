@@ -6,6 +6,7 @@ import edu.physics.ai.ExplanationRequest;
 import edu.physics.ai.InterpretationDraft;
 import edu.physics.ai.InterpretationRequest;
 import edu.physics.ai.ProviderResult;
+import edu.physics.problem.CanonicalSolution;
 import edu.physics.problem.PhysicalQuantity;
 import edu.physics.problem.PhysicalUnit;
 import edu.physics.problem.ProjectileProblem;
@@ -184,32 +185,62 @@ public final class LocalAIProvider implements AIProvider {
 
         // Section 2: Step-by-Step Analytical Derivation
         List<ExplanationDraft.Claim> derivationClaims = new ArrayList<>();
-        ProjectileSequenceSolution solution = request.verifiedSolution();
+        if (request.canonicalSolution() != null) {
+            CanonicalSolution solution = request.canonicalSolution();
+            for (CanonicalSolution.PartResult part : solution.partResults()) {
+                for (var step : part.steps()) {
+                    if (step.intermediateResults().containsKey("vx0")) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The constant horizontal velocity component is calculated as initial speed times cosine of the launch angle:", "vx0"));
+                    }
+                    if (step.intermediateResults().containsKey("vy0")) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The initial vertical velocity component is determined by initial speed times sine of the launch angle:", "vy0"));
+                    }
+                    if (step.intermediateResults().containsKey("tLanding")) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The total duration until the projectile returns to the landing surface is:", "tLanding"));
+                    }
+                    if (step.intermediateResults().containsKey("tApex")) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The elapsed time to reach the trajectory apex where vertical velocity vanishes is:", "tApex"));
+                    }
+                }
 
-        for (ProjectileSequenceSolution.PartResult part : solution.completedParts()) {
-            for (var step : part.solution().steps()) {
-                if (step.intermediateResults().containsKey("vx0")) {
-                    derivationClaims.add(new ExplanationDraft.Claim(
-                            "The constant horizontal velocity component is calculated as initial speed times cosine of the launch angle:", "vx0"));
-                }
-                if (step.intermediateResults().containsKey("vy0")) {
-                    derivationClaims.add(new ExplanationDraft.Claim(
-                            "The initial vertical velocity component is determined by initial speed times sine of the launch angle:", "vy0"));
-                }
-                if (step.intermediateResults().containsKey("tLanding")) {
-                    derivationClaims.add(new ExplanationDraft.Claim(
-                            "The total duration until the projectile returns to the landing surface is:", "tLanding"));
-                }
-                if (step.intermediateResults().containsKey("tApex")) {
-                    derivationClaims.add(new ExplanationDraft.Claim(
-                            "The elapsed time to reach the trajectory apex where vertical velocity vanishes is:", "tApex"));
+                for (Map<String, PhysicalQuantity> candidate : part.candidates()) {
+                    for (String key : candidate.keySet()) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The analytical calculation yields the verified result for this projectile target:", key));
+                    }
                 }
             }
+        } else if (request.verifiedSolution() != null) {
+            ProjectileSequenceSolution solution = request.verifiedSolution();
+            for (ProjectileSequenceSolution.PartResult part : solution.completedParts()) {
+                for (var step : part.solution().steps()) {
+                    if (step.intermediateResults().containsKey("vx0")) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The constant horizontal velocity component is calculated as initial speed times cosine of the launch angle:", "vx0"));
+                    }
+                    if (step.intermediateResults().containsKey("vy0")) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The initial vertical velocity component is determined by initial speed times sine of the launch angle:", "vy0"));
+                    }
+                    if (step.intermediateResults().containsKey("tLanding")) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The total duration until the projectile returns to the landing surface is:", "tLanding"));
+                    }
+                    if (step.intermediateResults().containsKey("tApex")) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The elapsed time to reach the trajectory apex where vertical velocity vanishes is:", "tApex"));
+                    }
+                }
 
-            for (Map<String, PhysicalQuantity> candidate : part.solution().candidates()) {
-                for (String key : candidate.keySet()) {
-                    derivationClaims.add(new ExplanationDraft.Claim(
-                            "The analytical calculation yields the verified result for this projectile target:", key));
+                for (Map<String, PhysicalQuantity> candidate : part.solution().candidates()) {
+                    for (String key : candidate.keySet()) {
+                        derivationClaims.add(new ExplanationDraft.Claim(
+                                "The analytical calculation yields the verified result for this projectile target:", key));
+                    }
                 }
             }
         }

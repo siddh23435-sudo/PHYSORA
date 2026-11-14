@@ -620,7 +620,7 @@ public final class ProjectileProblemSolver {
 
         List<CanonicalSolution.PartResult> results = new ArrayList<>(canonical.parts().size());
         for (CanonicalPhysicsProblem.PartSpec part : canonical.parts()) {
-            results.add(solveCanonicalPart(canonical, part, sharedMotion, baseAssumptions));
+            results.add(solveCanonicalPart(canonical, part, sharedMotion, results, baseAssumptions));
         }
 
         CanonicalSolution.OverallStatus overall = CanonicalSolution.deriveOverallStatus(results, false, false);
@@ -637,12 +637,77 @@ public final class ProjectileProblemSolver {
     private CanonicalSolution.PartResult solveCanonicalPart(
             CanonicalPhysicsProblem canonical,
             CanonicalPhysicsProblem.PartSpec part,
-            ProjectileMotion motion,
+            ProjectileMotion sharedMotion,
+            List<CanonicalSolution.PartResult> priorResults,
             List<String> baseAssumptions) {
 
         CanonicalPhysicsProblem.CanonicalTarget target = part.target();
+        EnumMap<Input, PhysicalQuantity> mergedGivens = new EnumMap<>(Input.class);
+        mergedGivens.putAll(part.parameters());
+
+        for (Map.Entry<Input, ProjectileProblemSequence.ResultReference> entry : part.references().entrySet()) {
+            Input input = entry.getKey();
+            ProjectileProblemSequence.ResultReference ref = entry.getValue();
+            if (ref == null || ref.quantityName() == null || ref.quantityName().isBlank()) {
+                return canonicalPartFailure(part, CanonicalSolution.PartStatus.INVALID_INPUT,
+                        CanonicalSolution.ContactClassification.NOT_APPLICABLE,
+                        List.of(), baseAssumptions,
+                        List.of("invalid-dependency-reference:" + (input != null ? input.name() : "null")));
+            }
+            if (ref.partIndex() < 0 || ref.partIndex() >= priorResults.size()) {
+                return canonicalPartFailure(part, CanonicalSolution.PartStatus.DEPENDENCY_UNAVAILABLE,
+                        CanonicalSolution.ContactClassification.NOT_APPLICABLE,
+                        List.of(), baseAssumptions,
+                        List.of("upstream-part-not-uniquely-solved:" + ref.partIndex()));
+            }
+            CanonicalSolution.PartResult prior = priorResults.get(ref.partIndex());
+            if (prior.status() != CanonicalSolution.PartStatus.SOLVED || prior.candidates().size() != 1) {
+                return canonicalPartFailure(part, CanonicalSolution.PartStatus.DEPENDENCY_UNAVAILABLE,
+                        CanonicalSolution.ContactClassification.NOT_APPLICABLE,
+                        List.of(), baseAssumptions,
+                        List.of("upstream-part-not-uniquely-solved:" + ref.partIndex()));
+            }
+            PhysicalQuantity quantity = prior.candidates().get(0).get(ref.quantityName());
+            if (quantity == null) {
+                return canonicalPartFailure(part, CanonicalSolution.PartStatus.DEPENDENCY_UNAVAILABLE,
+                        CanonicalSolution.ContactClassification.NOT_APPLICABLE,
+                        List.of(), baseAssumptions,
+                        List.of("referenced-result-not-found:" + ref.quantityName()));
+            }
+            if (input.dimension() != quantity.unit().dimension()) {
+                return canonicalPartFailure(part, CanonicalSolution.PartStatus.INVALID_INPUT,
+                        CanonicalSolution.ContactClassification.NOT_APPLICABLE,
+                        List.of(), baseAssumptions,
+                        List.of("incompatible-unit:" + input.name()));
+            }
+            if (!Double.isFinite(quantity.value())) {
+                return canonicalPartFailure(part, CanonicalSolution.PartStatus.INVALID_INPUT,
+                        CanonicalSolution.ContactClassification.NOT_APPLICABLE,
+                        List.of(), baseAssumptions,
+                        List.of("non-finite-input:" + input.name()));
+            }
+            double si = quantity.valueInSi();
+            if (!Double.isFinite(si)) {
+                return canonicalPartFailure(part, CanonicalSolution.PartStatus.INVALID_INPUT,
+                        CanonicalSolution.ContactClassification.NOT_APPLICABLE,
+                        List.of(), baseAssumptions,
+                        List.of("unit-conversion-overflow:" + input.name()));
+            }
+            if ((input == Input.TIME
+                    || input == Input.TARGET_SPEED
+                    || input == Input.INITIAL_SPEED
+                    || input == Input.GRAVITY)
+                    && si < 0.0) {
+                return canonicalPartFailure(part, CanonicalSolution.PartStatus.INVALID_INPUT,
+                        CanonicalSolution.ContactClassification.NOT_APPLICABLE,
+                        List.of(), baseAssumptions,
+                        List.of("negative-nonnegative-quantity:" + input.name()));
+            }
+            mergedGivens.put(input, quantity);
+        }
+
         EnumMap<Input, Double> partValues = new EnumMap<>(Input.class);
-        List<String> partErrors = validatePartParameters(part.parameters(), partValues);
+        List<String> partErrors = validatePartParameters(mergedGivens, partValues);
         if (!partErrors.isEmpty()) {
             return canonicalPartFailure(part, CanonicalSolution.PartStatus.INVALID_INPUT,
                     CanonicalSolution.ContactClassification.NOT_APPLICABLE,
@@ -652,19 +717,17 @@ public final class ProjectileProblemSolver {
         if (target instanceof CanonicalPhysicsProblem.StandardTarget standardTarget
                 && (standardTarget.target() == Target.FIND_INITIAL_SPEED
                 || standardTarget.target() == Target.FIND_LAUNCH_ANGLE)) {
-            return solveCanonicalInversePart(canonical, part, standardTarget.target(), baseAssumptions);
+            return solveCanonicalInversePart(canonical, part, mergedGivens, standardTarget.target(), baseAssumptions);
         }
 
-        List<String> missing = new ArrayList<>();
-        if (!canonical.hasVelocity()) {
-            canonical.missingSharedInputs().stream()
-                    .filter(input -> input != Input.GRAVITY)
-                    .map(Enum::name)
-                    .forEach(missing::add);
+        MotionResolution motionResolution = resolveEffectivePartMotion(canonical, sharedMotion, partValues);
+        if (motionResolution.inclineViolation()) {
+            return canonicalPartFailure(part, CanonicalSolution.PartStatus.INVALID_INPUT,
+                    CanonicalSolution.ContactClassification.NOT_APPLICABLE,
+                    List.of(), baseAssumptions, List.of("launch-below-inclined-surface"));
         }
-        if (!canonical.hasGravity()) {
-            missing.add(Input.GRAVITY.name());
-        }
+
+        List<String> missing = new ArrayList<>(motionResolution.missingInputs());
         if (target instanceof CanonicalPhysicsProblem.StandardTarget standardTarget) {
             for (Input req : requiredPartInputsFor(standardTarget.target())) {
                 if (!partValues.containsKey(req)) {
@@ -680,22 +743,121 @@ public final class ProjectileProblemSolver {
                     List.of("additional-inputs-required"));
         }
 
+        ProjectileMotion effectiveMotion = motionResolution.motion();
         if (target instanceof CanonicalPhysicsProblem.SurfaceTarget surfaceTarget) {
-            return solveCanonicalSurfacePart(part, surfaceTarget, motion, baseAssumptions);
+            return solveCanonicalSurfacePart(part, surfaceTarget, effectiveMotion, baseAssumptions);
         }
 
         Target stdTarget = ((CanonicalPhysicsProblem.StandardTarget) target).target();
-        return solveCanonicalStandardForwardPart(canonical, part, stdTarget, partValues, motion, baseAssumptions);
+        return solveCanonicalStandardForwardPart(canonical, part, stdTarget, partValues, effectiveMotion, baseAssumptions);
+    }
+
+    private record MotionResolution(ProjectileMotion motion, List<String> missingInputs, boolean inclineViolation) {}
+
+    private static MotionResolution resolveEffectivePartMotion(
+            CanonicalPhysicsProblem canonical,
+            ProjectileMotion sharedMotion,
+            Map<Input, Double> partValues) {
+
+        boolean hasMotionOverride = partValues.containsKey(Input.INITIAL_SPEED)
+                || partValues.containsKey(Input.LAUNCH_ANGLE)
+                || partValues.containsKey(Input.GRAVITY)
+                || partValues.containsKey(Input.INITIAL_X)
+                || partValues.containsKey(Input.INITIAL_Y)
+                || partValues.containsKey(Input.LANDING_Y);
+
+        if (sharedMotion != null && !hasMotionOverride) {
+            return new MotionResolution(sharedMotion, List.of(), false);
+        }
+
+        Double gravity = partValues.containsKey(Input.GRAVITY)
+                ? partValues.get(Input.GRAVITY)
+                : (canonical.gravity().isPresent() ? canonical.gravity().getAsDouble() : null);
+
+        double x0 = partValues.getOrDefault(Input.INITIAL_X, canonical.initialX());
+        double y0 = partValues.getOrDefault(Input.INITIAL_Y, canonical.initialY());
+        LandingSurface surface = canonical.landingSurface().isHorizontal() && partValues.containsKey(Input.LANDING_Y)
+                ? LandingSurface.horizontal(partValues.get(Input.LANDING_Y))
+                : canonical.landingSurface();
+
+        if (!surface.isHorizontal()) {
+            double clearance = y0 - surface.heightAt(x0);
+            double scale = Math.abs(y0) + Math.abs(surface.anchorY())
+                    + Math.abs((x0 - surface.anchorX()) * surface.slopeTangent());
+            double tolerance = scale == 0.0 ? 0.0 : 16.0 * Math.ulp(scale);
+            if (clearance < -tolerance) {
+                return new MotionResolution(null, List.of(), true);
+            }
+        }
+
+        List<String> missing = new ArrayList<>();
+        if (gravity == null) {
+            missing.add(Input.GRAVITY.name());
+        }
+
+        if (canonical.hasVelocity()
+                && !partValues.containsKey(Input.INITIAL_SPEED)
+                && !partValues.containsKey(Input.LAUNCH_ANGLE)) {
+            if (gravity == null) {
+                return new MotionResolution(null, missing, false);
+            }
+            ProjectileMotion motion = ProjectileMotion.fromVelocityComponents(
+                    canonical.initialVx().getAsDouble(),
+                    canonical.initialVy().getAsDouble(),
+                    gravity,
+                    x0,
+                    y0,
+                    surface);
+            return new MotionResolution(motion, List.of(), false);
+        }
+
+        CanonicalPhysicsProblem.VelocityInputMetadata meta = canonical.velocityMetadata();
+        Double speed = partValues.get(Input.INITIAL_SPEED);
+        if (speed == null && canonical.derivedInitialSpeed().isPresent()) {
+            speed = canonical.derivedInitialSpeed().getAsDouble();
+        } else if (speed == null
+                && meta.submittedSpeed() != null
+                && meta.submittedSpeed().unit().dimension() == PhysicalUnit.Dimension.SPEED
+                && Double.isFinite(meta.submittedSpeed().valueInSi())) {
+            speed = meta.submittedSpeed().valueInSi();
+        }
+
+        Double angleDeg = partValues.get(Input.LAUNCH_ANGLE);
+        if (angleDeg == null && canonical.derivedLaunchAngleDegrees().isPresent()) {
+            angleDeg = canonical.derivedLaunchAngleDegrees().getAsDouble();
+        } else if (angleDeg == null
+                && meta.submittedAngle() != null
+                && meta.submittedAngle().unit().dimension() == PhysicalUnit.Dimension.ANGLE
+                && Double.isFinite(meta.submittedAngle().valueInSi())) {
+            double rawAngle = meta.submittedAngle().valueInSi();
+            angleDeg = meta.angleReference() == CanonicalPhysicsProblem.AngleReference.INCLINE_SURFACE
+                    ? rawAngle + surface.angleDegrees()
+                    : rawAngle;
+        }
+
+        if (speed == null) {
+            missing.add(Input.INITIAL_SPEED.name());
+        }
+        if (angleDeg == null) {
+            missing.add(Input.LAUNCH_ANGLE.name());
+        }
+        if (!missing.isEmpty()) {
+            return new MotionResolution(null, missing, false);
+        }
+
+        ProjectileMotion motion = new ProjectileMotion(speed, angleDeg, gravity, x0, y0, surface);
+        return new MotionResolution(motion, List.of(), false);
     }
 
     private CanonicalSolution.PartResult solveCanonicalInversePart(
             CanonicalPhysicsProblem canonical,
             CanonicalPhysicsProblem.PartSpec part,
+            Map<Input, PhysicalQuantity> mergedGivens,
             Target inverseTarget,
             List<String> baseAssumptions) {
         if (!canonical.landingSurface().isHorizontal()
-                && part.parameters().containsKey(Input.HORIZONTAL_DISPLACEMENT)
-                && !part.parameters().containsKey(Input.VERTICAL_DISPLACEMENT)) {
+                && mergedGivens.containsKey(Input.HORIZONTAL_DISPLACEMENT)
+                && !mergedGivens.containsKey(Input.VERTICAL_DISPLACEMENT)) {
             return canonicalPartFailure(part, CanonicalSolution.PartStatus.UNSUPPORTED,
                     CanonicalSolution.ContactClassification.NOT_APPLICABLE,
                     List.of(), baseAssumptions,
@@ -732,7 +894,7 @@ public final class ProjectileProblemSolver {
             }
         }
 
-        givens.putAll(part.parameters());
+        givens.putAll(mergedGivens);
         ProjectileSolution legacy = solve(new ProjectileProblem(canonical.statement(), inverseTarget, givens));
         return fromLegacyInverseSolution(part, legacy, baseAssumptions);
     }

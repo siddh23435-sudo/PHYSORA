@@ -79,11 +79,30 @@ public final class CanonicalPhysicsProblem {
         }
     }
 
-    /** Requested target plus target-specific parameters (such as query time or target height). */
+    /**
+     * Requested target plus target-specific parameters and upstream result references.
+     *
+     * <p><b>Reference Precedence:</b> In {@link CanonicalPhysicsProblem}, problem-level inputs
+     * (such as launch speed, angle, gravity, initial positions, or landing surface) are authoritative.
+     * A part-level dependency reference cannot override an explicitly supplied problem-level input.
+     * Furthermore, part-level {@code parameters} and {@code references} must be strictly disjoint.
+     * Supplying a reference for an input already defined at the problem level or in {@code parameters}
+     * produces a {@code "conflicting-input-definition:<input>"} validation error.
+     *
+     * <p>This intentionally differs from legacy {@code ProjectileProblemSequence} behavior, where
+     * step references silently overwrote shared problem-level givens.
+     */
     public record PartSpec(
             int index,
             CanonicalTarget target,
-            Map<ProjectileProblem.Input, PhysicalQuantity> parameters) {
+            Map<ProjectileProblem.Input, PhysicalQuantity> parameters,
+            Map<ProjectileProblem.Input, ProjectileProblemSequence.ResultReference> references) {
+        public PartSpec(int index,
+                        CanonicalTarget target,
+                        Map<ProjectileProblem.Input, PhysicalQuantity> parameters) {
+            this(index, target, parameters, Map.of());
+        }
+
         public PartSpec {
             if (index < 0) {
                 throw new IllegalArgumentException("Part index must be non-negative");
@@ -99,6 +118,17 @@ public final class CanonicalPhysicsProblem {
                     throw new IllegalArgumentException("Part parameters cannot contain null values");
                 }
                 parameters = Collections.unmodifiableMap(copy);
+            }
+            if (references == null || references.isEmpty()) {
+                references = Map.of();
+            } else {
+                EnumMap<ProjectileProblem.Input, ProjectileProblemSequence.ResultReference> copy =
+                        new EnumMap<>(ProjectileProblem.Input.class);
+                copy.putAll(references);
+                if (copy.containsValue(null)) {
+                    throw new IllegalArgumentException("Part references cannot contain null values");
+                }
+                references = Collections.unmodifiableMap(copy);
             }
         }
     }
@@ -360,21 +390,68 @@ public final class CanonicalPhysicsProblem {
         }
 
         public Builder addTarget(CanonicalTarget target) {
-            return addTarget(target, Map.of());
+            return addTarget(target, Map.of(), Map.of());
         }
 
         public Builder addTarget(ProjectileProblem.Target target) {
-            return addTarget(CanonicalPhysicsProblem.target(target), Map.of());
+            return addTarget(CanonicalPhysicsProblem.target(target), Map.of(), Map.of());
         }
 
         public Builder addTarget(SurfaceTarget target) {
-            return addTarget((CanonicalTarget) target, Map.of());
+            return addTarget((CanonicalTarget) target, Map.of(), Map.of());
         }
 
         public Builder addTarget(CanonicalTarget target, Map<ProjectileProblem.Input, PhysicalQuantity> parameters) {
+            return addTarget(target, parameters, Map.of());
+        }
+
+        public Builder addTarget(ProjectileProblem.Target target, Map<ProjectileProblem.Input, PhysicalQuantity> parameters) {
+            return addTarget(CanonicalPhysicsProblem.target(target), parameters, Map.of());
+        }
+
+        public Builder addTarget(SurfaceTarget target, Map<ProjectileProblem.Input, PhysicalQuantity> parameters) {
+            return addTarget((CanonicalTarget) target, parameters, Map.of());
+        }
+
+        /**
+         * Adds a part requesting {@code target} with part-specific parameters and upstream result references.
+         *
+         * <p><b>Reference Precedence:</b> Explicit problem-level inputs are authoritative. A part reference
+         * supplying a shared input (such as {@code INITIAL_SPEED} or {@code LAUNCH_ANGLE}) is valid only
+         * when that parameter was left unspecified at the problem level (e.g. in inverse-to-forward problems).
+         * Part-level {@code parameters} and {@code references} must be strictly disjoint. Conflicting
+         * definitions are rejected at {@link #build()} time as {@code "conflicting-input-definition:<input>"}.
+         * This intentionally differs from legacy {@code ProjectileProblemSequence} behavior, where references
+         * silently overwrote shared givens.
+         */
+        public Builder addTarget(CanonicalTarget target,
+                                 Map<ProjectileProblem.Input, PhysicalQuantity> parameters,
+                                 Map<ProjectileProblem.Input, ProjectileProblemSequence.ResultReference> references) {
             int nextIndex = requestedParts.size();
-            requestedParts.add(new PartSpec(nextIndex, target, parameters));
+            requestedParts.add(new PartSpec(nextIndex, target, parameters, references));
             return this;
+        }
+
+        /**
+         * Adds a standard target with part-specific parameters and upstream result references.
+         *
+         * @see #addTarget(CanonicalTarget, Map, Map)
+         */
+        public Builder addTarget(ProjectileProblem.Target target,
+                                 Map<ProjectileProblem.Input, PhysicalQuantity> parameters,
+                                 Map<ProjectileProblem.Input, ProjectileProblemSequence.ResultReference> references) {
+            return addTarget(CanonicalPhysicsProblem.target(target), parameters, references);
+        }
+
+        /**
+         * Adds a surface target with part-specific parameters and upstream result references.
+         *
+         * @see #addTarget(CanonicalTarget, Map, Map)
+         */
+        public Builder addTarget(SurfaceTarget target,
+                                 Map<ProjectileProblem.Input, PhysicalQuantity> parameters,
+                                 Map<ProjectileProblem.Input, ProjectileProblemSequence.ResultReference> references) {
+            return addTarget((CanonicalTarget) target, parameters, references);
         }
 
         public Builder addConstraint(String constraint) {
@@ -406,11 +483,13 @@ public final class CanonicalPhysicsProblem {
             List<PartSpec> builtParts = new ArrayList<>(requestedParts.size());
             for (int i = 0; i < requestedParts.size(); i++) {
                 PartSpec raw = requestedParts.get(i);
-                builtParts.add(new PartSpec(i, raw.target(), raw.parameters()));
+                builtParts.add(new PartSpec(i, raw.target(), raw.parameters(), raw.references()));
             }
             List<String> localAssumptions = new ArrayList<>(assumptions);
             List<String> localErrors = new ArrayList<>();
             List<ProjectileProblem.Input> localMissing = new ArrayList<>();
+
+            validatePartReferences(builtParts, localErrors);
 
             Double x0Value = validateLengthQuantity(x0Quantity, ProjectileProblem.Input.INITIAL_X, localErrors);
             double resolvedX0 = 0.0;
@@ -746,6 +825,41 @@ public final class CanonicalPhysicsProblem {
                 return switch (quadrant) { case 1 -> 1.0; case 3 -> -1.0; default -> 0.0; };
             }
             return Math.sin(Math.toRadians(degrees % 360.0));
+        }
+
+        private void validatePartReferences(List<PartSpec> builtParts, List<String> localErrors) {
+            for (PartSpec part : builtParts) {
+                for (Map.Entry<ProjectileProblem.Input, ProjectileProblemSequence.ResultReference> entry
+                        : part.references().entrySet()) {
+                    ProjectileProblem.Input input = entry.getKey();
+                    ProjectileProblemSequence.ResultReference ref = entry.getValue();
+                    if (ref == null || ref.quantityName() == null || ref.quantityName().isBlank()) {
+                        localErrors.add("invalid-dependency-reference:" + (input != null ? input.name() : "null"));
+                        continue;
+                    }
+                    if (ref.partIndex() < 0 || ref.partIndex() >= part.index()) {
+                        localErrors.add("invalid-dependency-reference:" + input.name());
+                    }
+                    if (part.parameters().containsKey(input)) {
+                        localErrors.add("conflicting-input-definition:" + input.name());
+                    }
+                    if (conflictsWithProblemLevel(input)) {
+                        localErrors.add("conflicting-input-definition:" + input.name());
+                    }
+                }
+            }
+        }
+
+        private boolean conflictsWithProblemLevel(ProjectileProblem.Input input) {
+            return switch (input) {
+                case INITIAL_X -> x0Quantity != null;
+                case INITIAL_Y -> y0Quantity != null;
+                case LANDING_Y -> landingYQuantity != null || explicitLandingSurface != null;
+                case GRAVITY -> gravityQuantity != null;
+                case INITIAL_SPEED -> polarSpeed != null || cartesianVx != null || cartesianVy != null;
+                case LAUNCH_ANGLE -> polarAngle != null || cartesianVx != null || cartesianVy != null;
+                default -> false;
+            };
         }
 
         private static double normalizeZero(double value) {

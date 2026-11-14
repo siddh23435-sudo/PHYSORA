@@ -1,5 +1,8 @@
 package edu.physics.ai;
 
+import edu.physics.problem.CanonicalSolution;
+import edu.physics.problem.ProjectileSolution;
+
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -41,7 +44,13 @@ public final class AIProblemWorkflow {
                 result.complete(providerError(request.question(), null, failure));
                 return;
             }
-            processInterpretation(request, interpretation, result);
+            try {
+                processInterpretation(request, interpretation, result);
+            } catch (Throwable t) {
+                System.err.println("[PHYSORA AI] Unexpected error during interpretation processing: " + t.getMessage());
+                t.printStackTrace();
+                result.complete(providerError(request.question(), interpretation, t));
+            }
         });
         result.whenComplete((ignored, failure) -> {
             if (result.isCancelled()) activeCall.cancel(true);
@@ -52,10 +61,16 @@ public final class AIProblemWorkflow {
     private void processInterpretation(InterpretationRequest request,
                                       ProviderResult<InterpretationDraft> interpretation,
                                       CompletableFuture<AIWorkflowResult> result) {
-        ProblemValidationResult validation = validator.validate(request.question(), interpretation.content());
+        // Pass the full InterpretationRequest with clarification history into validation
+        ProblemValidationResult validation = validator.validate(request, interpretation.content());
         if (validation.status() == ProblemValidationResult.Status.NEEDS_CLARIFICATION) {
             result.complete(new AIWorkflowResult(AIWorkflowResult.Status.NEEDS_CLARIFICATION, request.question(),
                     interpretation, validation, null, null, null, null, "clarification-required"));
+            return;
+        }
+        if (validation.status() == ProblemValidationResult.Status.UNSUPPORTED) {
+            result.complete(new AIWorkflowResult(AIWorkflowResult.Status.UNSUPPORTED_PROBLEM, request.question(),
+                    interpretation, validation, null, null, null, null, "unsupported-physics-constraints"));
             return;
         }
         if (validation.status() != ProblemValidationResult.Status.READY) {
@@ -63,15 +78,30 @@ public final class AIProblemWorkflow {
                     interpretation, validation, null, null, null, null, "interpretation-invalid"));
             return;
         }
+
         SolverOrchestrator.OrchestrationResult orchestration = solver.solve(validation);
         if (orchestration.status() != SolverOrchestrator.Status.VERIFIED) {
             result.complete(new AIWorkflowResult(AIWorkflowResult.Status.SOLVER_REJECTED, request.question(),
-                    interpretation, validation, orchestration, null, null, null, "solver-output-rejected"));
+                    interpretation, validation, orchestration, null, null, null, orchestration.messageCode()));
             return;
         }
+
+        // Strict explanation eligibility check: only fully, uniquely solved problems enter AI explanation
+        if (!isEligibleForExplanation(orchestration)) {
+            String messageCode = orchestration.canonicalSolution() != null
+                    ? "solver-output-" + orchestration.canonicalSolution().status().name().toLowerCase().replace('_', '-')
+                    : "solver-output-multiple-solutions";
+            result.complete(new AIWorkflowResult(AIWorkflowResult.Status.SOLVER_REJECTED, request.question(),
+                    interpretation, validation, orchestration, null, null, null, messageCode));
+            return;
+        }
+
         CompletionStage<ProviderResult<ExplanationDraft>> explanationStage;
         try {
-            explanationStage = provider.explain(new ExplanationRequest(request.question(), orchestration.solution()));
+            ExplanationRequest explanationRequest = orchestration.canonicalSolution() != null
+                    ? new ExplanationRequest(request.question(), orchestration.canonicalSolution())
+                    : new ExplanationRequest(request.question(), orchestration.solution());
+            explanationStage = provider.explain(explanationRequest);
         } catch (RuntimeException ex) {
             result.complete(providerError(request.question(), interpretation, ex));
             return;
@@ -89,14 +119,37 @@ public final class AIProblemWorkflow {
                 result.complete(providerError(request.question(), interpretation, failure));
                 return;
             }
-            ExplanationVerifier.Verification verification = explanationVerifier.verify(
-                    explanation.content(), orchestration.solution());
+            ExplanationVerifier.Verification verification = orchestration.canonicalSolution() != null
+                    ? explanationVerifier.verify(explanation.content(), orchestration.canonicalSolution())
+                    : explanationVerifier.verify(explanation.content(), orchestration.solution());
             AIWorkflowResult.Status status = verification.verified()
                     ? AIWorkflowResult.Status.COMPLETE : AIWorkflowResult.Status.EXPLANATION_REJECTED;
             result.complete(new AIWorkflowResult(status, request.question(), interpretation, validation,
                     orchestration, explanation, verification, null,
                     verification.verified() ? "complete" : "explanation-output-rejected"));
         });
+    }
+
+    private static boolean isEligibleForExplanation(SolverOrchestrator.OrchestrationResult orchestration) {
+        if (orchestration.canonicalSolution() != null) {
+            CanonicalSolution canonical = orchestration.canonicalSolution();
+            if (canonical.status() != CanonicalSolution.OverallStatus.SOLVED) {
+                return false;
+            }
+            for (CanonicalSolution.PartResult part : canonical.partResults()) {
+                if (part.status() != CanonicalSolution.PartStatus.SOLVED || part.candidates().size() != 1) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (orchestration.solution() != null) {
+            return orchestration.solution().status() == ProjectileSolution.Status.SOLVED
+                    && orchestration.solution().completedParts().stream()
+                            .allMatch(p -> p.solution().status() == ProjectileSolution.Status.SOLVED
+                                    && p.solution().candidates().size() == 1);
+        }
+        return false;
     }
 
     private static AIWorkflowResult providerError(String question,

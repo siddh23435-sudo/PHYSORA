@@ -11,7 +11,7 @@ public record AIWorkflowResult(Status status,
                                AIProviderException.Kind providerError,
                                String messageCode,
                                String detailMessage) {
-    public enum Status { COMPLETE, NEEDS_CLARIFICATION, INVALID_PROBLEM, SOLVER_REJECTED, EXPLANATION_REJECTED, PROVIDER_ERROR }
+    public enum Status { COMPLETE, NEEDS_CLARIFICATION, INVALID_PROBLEM, UNSUPPORTED_PROBLEM, SOLVER_REJECTED, EXPLANATION_REJECTED, PROVIDER_ERROR }
 
     public AIWorkflowResult {
         if (status == null || originalQuestion == null || messageCode == null) {

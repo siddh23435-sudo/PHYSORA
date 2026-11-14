@@ -1,7 +1,9 @@
 package edu.physics.ai;
 
+import edu.physics.problem.CanonicalSolution;
 import edu.physics.problem.ProjectileSequenceSolution;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,7 +24,25 @@ public final class ExplanationVerifier {
                 resultKeys.addAll(step.substitutions().keySet());
             });
         });
-        java.util.ArrayList<String> issues = new java.util.ArrayList<>();
+        return verifyInternal(explanation, resultKeys);
+    }
+
+    public Verification verify(ExplanationDraft explanation, CanonicalSolution solution) {
+        if (explanation == null || solution == null) return new Verification(false, List.of("explanation-and-verified-solution-required"));
+        Set<String> resultKeys = new HashSet<>();
+        solution.partResults().forEach(part -> {
+            part.candidates().forEach(candidate -> resultKeys.addAll(candidate.keySet()));
+            part.steps().forEach(step -> {
+                resultKeys.addAll(step.results().keySet());
+                resultKeys.addAll(step.intermediateResults().keySet());
+                resultKeys.addAll(step.substitutions().keySet());
+            });
+        });
+        return verifyInternal(explanation, resultKeys);
+    }
+
+    private Verification verifyInternal(ExplanationDraft explanation, Set<String> resultKeys) {
+        List<String> issues = new ArrayList<>();
         if (explanation.sections().isEmpty()) issues.add("explanation-has-no-sections");
         for (int sectionIndex = 0; sectionIndex < explanation.sections().size(); sectionIndex++) {
             ExplanationDraft.Section section = explanation.sections().get(sectionIndex);

@@ -341,6 +341,7 @@ public final class PhysicsCapabilityRegistry {
         List<String> partInvalid = new ArrayList<>();
 
         validatePartParameters(part.parameters(), partInvalid);
+        validatePartReferences(part, partInvalid);
 
         if (target instanceof CanonicalPhysicsProblem.StandardTarget standardTarget) {
             ProjectileProblem.Target std = standardTarget.target();
@@ -353,7 +354,7 @@ public final class PhysicsCapabilityRegistry {
                         partMatched, partMissing, partUnsupported);
             }
         } else if (target instanceof CanonicalPhysicsProblem.SurfaceTarget surfaceTarget) {
-            assessSurfaceTarget(problem, surfaceTarget, surfaceKind, partMatched, partMissing, partUnsupported);
+            assessSurfaceTarget(problem, part, surfaceTarget, surfaceKind, partMatched, partMissing, partUnsupported);
         }
 
         SupportStatus status;
@@ -402,15 +403,16 @@ public final class PhysicsCapabilityRegistry {
             }
         }
 
-        collectMissingSharedForwardInputs(problem, missing);
+        collectMissingSharedForwardInputs(problem, part, missing);
         for (ProjectileProblem.Input req : requiredPartInputsFor(target)) {
-            if (!part.parameters().containsKey(req)) {
+            if (!part.parameters().containsKey(req) && !part.references().containsKey(req)) {
                 missing.add(req.name());
             }
         }
     }
 
     private void assessSurfaceTarget(CanonicalPhysicsProblem problem,
+                                     CanonicalPhysicsProblem.PartSpec part,
                                      CanonicalPhysicsProblem.SurfaceTarget target,
                                      SurfaceKind surfaceKind,
                                      List<String> matched,
@@ -423,7 +425,7 @@ public final class PhysicsCapabilityRegistry {
         } else {
             unsupported.add("surface-target-not-supported:" + target.name() + ":" + surfaceKind.name());
         }
-        collectMissingSharedForwardInputs(problem, missing);
+        collectMissingSharedForwardInputs(problem, part, missing);
     }
 
     private void assessInverseTarget(CanonicalPhysicsProblem problem,
@@ -434,19 +436,24 @@ public final class PhysicsCapabilityRegistry {
                                      List<String> missing,
                                      List<String> unsupported) {
         Map<ProjectileProblem.Input, PhysicalQuantity> params = part.parameters();
+        Map<ProjectileProblem.Input, ProjectileProblemSequence.ResultReference> refs = part.references();
 
         // Exact solver truth from ProjectileProblemSolver.solveCanonicalInversePart:
         // An inverse query on an inclined surface that supplies HORIZONTAL_DISPLACEMENT
         // without VERTICAL_DISPLACEMENT requires inclined-surface intersection, which is unsupported.
-        if (surfaceKind == SurfaceKind.INCLINED_PLANE
-                && params.containsKey(ProjectileProblem.Input.HORIZONTAL_DISPLACEMENT)
-                && !params.containsKey(ProjectileProblem.Input.VERTICAL_DISPLACEMENT)) {
+        boolean hasDx = params.containsKey(ProjectileProblem.Input.HORIZONTAL_DISPLACEMENT)
+                || refs.containsKey(ProjectileProblem.Input.HORIZONTAL_DISPLACEMENT);
+        boolean hasDy = params.containsKey(ProjectileProblem.Input.VERTICAL_DISPLACEMENT)
+                || refs.containsKey(ProjectileProblem.Input.VERTICAL_DISPLACEMENT);
+        if (surfaceKind == SurfaceKind.INCLINED_PLANE && hasDx && !hasDy) {
             unsupported.add("inverse-target-requires-inclined-surface-intersection:" + inverseTarget.name());
         } else {
             matched.add(CAPABILITY_INVERSE_PROJECTILE_PARAMETERS);
         }
 
-        if (!problem.hasGravity()) {
+        if (!problem.hasGravity()
+                && !params.containsKey(ProjectileProblem.Input.GRAVITY)
+                && !refs.containsKey(ProjectileProblem.Input.GRAVITY)) {
             missing.add(ProjectileProblem.Input.GRAVITY.name());
         }
 
@@ -455,16 +462,18 @@ public final class PhysicsCapabilityRegistry {
             boolean hasAngle = problem.derivedLaunchAngleDegrees().isPresent()
                     || (meta.submittedAngle() != null
                     && meta.submittedAngle().unit().dimension() == PhysicalUnit.Dimension.ANGLE
-                    && Double.isFinite(meta.submittedAngle().valueInSi()));
+                    && Double.isFinite(meta.submittedAngle().valueInSi()))
+                    || params.containsKey(ProjectileProblem.Input.LAUNCH_ANGLE)
+                    || refs.containsKey(ProjectileProblem.Input.LAUNCH_ANGLE);
             if (!hasAngle) {
                 missing.add(ProjectileProblem.Input.LAUNCH_ANGLE.name());
             }
             boolean hasCondition = params.containsKey(ProjectileProblem.Input.TARGET_VX)
-                    || (params.containsKey(ProjectileProblem.Input.TIME)
-                    && (params.containsKey(ProjectileProblem.Input.TARGET_VY)
-                    || params.containsKey(ProjectileProblem.Input.TARGET_SPEED)))
-                    || (params.containsKey(ProjectileProblem.Input.HORIZONTAL_DISPLACEMENT)
-                    && params.containsKey(ProjectileProblem.Input.VERTICAL_DISPLACEMENT));
+                    || refs.containsKey(ProjectileProblem.Input.TARGET_VX)
+                    || ((params.containsKey(ProjectileProblem.Input.TIME) || refs.containsKey(ProjectileProblem.Input.TIME))
+                    && (params.containsKey(ProjectileProblem.Input.TARGET_VY) || refs.containsKey(ProjectileProblem.Input.TARGET_VY)
+                    || params.containsKey(ProjectileProblem.Input.TARGET_SPEED) || refs.containsKey(ProjectileProblem.Input.TARGET_SPEED)))
+                    || (hasDx && hasDy);
             if (!hasCondition && unsupported.isEmpty()) {
                 missing.add("INVERSE_SPEED_CONDITION");
             }
@@ -472,34 +481,64 @@ public final class PhysicsCapabilityRegistry {
             boolean hasSpeed = problem.derivedInitialSpeed().isPresent()
                     || (meta.submittedSpeed() != null
                     && meta.submittedSpeed().unit().dimension() == PhysicalUnit.Dimension.SPEED
-                    && Double.isFinite(meta.submittedSpeed().valueInSi()));
+                    && Double.isFinite(meta.submittedSpeed().valueInSi()))
+                    || params.containsKey(ProjectileProblem.Input.INITIAL_SPEED)
+                    || refs.containsKey(ProjectileProblem.Input.INITIAL_SPEED);
             if (!hasSpeed) {
                 missing.add(ProjectileProblem.Input.INITIAL_SPEED.name());
             }
-            if (!params.containsKey(ProjectileProblem.Input.HORIZONTAL_DISPLACEMENT)) {
+            if (!hasDx) {
                 missing.add(ProjectileProblem.Input.HORIZONTAL_DISPLACEMENT.name());
             }
-            if (!params.containsKey(ProjectileProblem.Input.VERTICAL_DISPLACEMENT) && unsupported.isEmpty()) {
+            if (!hasDy && unsupported.isEmpty()) {
                 missing.add(ProjectileProblem.Input.VERTICAL_DISPLACEMENT.name());
             }
         }
     }
 
-    private static void collectMissingSharedForwardInputs(CanonicalPhysicsProblem problem, List<String> missing) {
+    private static void collectMissingSharedForwardInputs(CanonicalPhysicsProblem problem,
+                                                          CanonicalPhysicsProblem.PartSpec part,
+                                                          List<String> missing) {
         if (!problem.hasVelocity()) {
-            problem.missingSharedInputs().stream()
-                    .filter(input -> input != ProjectileProblem.Input.GRAVITY)
-                    .map(Enum::name)
-                    .forEach(missing::add);
-            if (missing.stream().noneMatch(m -> m.equals(ProjectileProblem.Input.INITIAL_SPEED.name())
-                    || m.equals(ProjectileProblem.Input.LAUNCH_ANGLE.name()))) {
+            CanonicalPhysicsProblem.VelocityInputMetadata meta = problem.velocityMetadata();
+            boolean hasSpeed = problem.derivedInitialSpeed().isPresent()
+                    || (meta.submittedSpeed() != null
+                    && meta.submittedSpeed().unit().dimension() == PhysicalUnit.Dimension.SPEED
+                    && Double.isFinite(meta.submittedSpeed().valueInSi()))
+                    || part.parameters().containsKey(ProjectileProblem.Input.INITIAL_SPEED)
+                    || part.references().containsKey(ProjectileProblem.Input.INITIAL_SPEED);
+            boolean hasAngle = problem.derivedLaunchAngleDegrees().isPresent()
+                    || (meta.submittedAngle() != null
+                    && meta.submittedAngle().unit().dimension() == PhysicalUnit.Dimension.ANGLE
+                    && Double.isFinite(meta.submittedAngle().valueInSi()))
+                    || part.parameters().containsKey(ProjectileProblem.Input.LAUNCH_ANGLE)
+                    || part.references().containsKey(ProjectileProblem.Input.LAUNCH_ANGLE);
+            if (!hasSpeed) {
                 missing.add(ProjectileProblem.Input.INITIAL_SPEED.name());
+            }
+            if (!hasAngle) {
                 missing.add(ProjectileProblem.Input.LAUNCH_ANGLE.name());
             }
         }
-        if (!problem.hasGravity()) {
+        if (!problem.hasGravity()
+                && !part.parameters().containsKey(ProjectileProblem.Input.GRAVITY)
+                && !part.references().containsKey(ProjectileProblem.Input.GRAVITY)) {
             missing.add(ProjectileProblem.Input.GRAVITY.name());
         }
+    }
+
+    private static void validatePartReferences(CanonicalPhysicsProblem.PartSpec part, List<String> partErrors) {
+        part.references().forEach((input, ref) -> {
+            if (input == null || ref == null) {
+                partErrors.add("null-input-quantity");
+            } else if (ref.quantityName() == null || ref.quantityName().isBlank()) {
+                partErrors.add("invalid-dependency-reference:" + input.name());
+            } else if (ref.partIndex() < 0 || ref.partIndex() >= part.index()) {
+                partErrors.add("invalid-dependency-reference:" + input.name());
+            } else if (part.parameters().containsKey(input)) {
+                partErrors.add("conflicting-input-definition:" + input.name());
+            }
+        });
     }
 
     private static void validatePartParameters(Map<ProjectileProblem.Input, PhysicalQuantity> parameters,

@@ -1,5 +1,7 @@
 package edu.physics.ai;
 
+import edu.physics.problem.CanonicalPhysicsProblem;
+import edu.physics.problem.CanonicalSolution;
 import edu.physics.problem.PhysicalQuantity;
 import edu.physics.problem.PhysicalUnit;
 import edu.physics.problem.ProjectileProblem;
@@ -15,6 +17,69 @@ import java.util.Map;
 /** Checks solver-result completeness, units, finiteness, and equation/result association. */
 public final class SolutionVerifier {
     private static final double RELATIVE_TOLERANCE = 1e-9;
+
+    public Verification verify(CanonicalPhysicsProblem problem, CanonicalSolution solution) {
+        if (problem == null || solution == null) {
+            return new Verification(false, List.of("problem-and-solution-required"));
+        }
+        boolean completeUnique = solution.status() == CanonicalSolution.OverallStatus.SOLVED;
+        boolean completeMultiple = solution.status() == CanonicalSolution.OverallStatus.MULTIPLE_SOLUTIONS
+                && solution.partResults().size() == problem.parts().size();
+        if ((!completeUnique && !completeMultiple) || solution.partResults().size() != problem.parts().size()) {
+            return new Verification(false, List.of("canonical-status-not-solved:" + solution.status()));
+        }
+        List<String> issues = new ArrayList<>();
+        for (int i = 0; i < solution.partResults().size(); i++) {
+            final int partIndex = i;
+            CanonicalSolution.PartResult partResult = solution.partResults().get(i);
+            CanonicalPhysicsProblem.PartSpec partSpec = problem.parts().get(i);
+            if (partResult.partIndex() != i) issues.add("part-order-mismatch:" + i);
+            if (!partResult.target().equals(partSpec.target())) issues.add("target-mismatch:" + i);
+            if (partResult.status() != CanonicalSolution.PartStatus.SOLVED
+                    && partResult.status() != CanonicalSolution.PartStatus.MULTIPLE_SOLUTIONS) {
+                issues.add("unsolved-status:" + i);
+                continue;
+            }
+            if (partResult.candidates().isEmpty()) issues.add("no-candidates:" + i);
+            if (partResult.status() == CanonicalSolution.PartStatus.SOLVED && partResult.candidates().size() != 1) {
+                issues.add("solved-candidate-count-mismatch:" + i);
+            }
+            if (partResult.status() == CanonicalSolution.PartStatus.MULTIPLE_SOLUTIONS && partResult.candidates().size() < 2) {
+                issues.add("multiple-status-candidate-count-mismatch:" + i);
+            }
+            if (partResult.steps().isEmpty()) issues.add("no-derivation-steps:" + i);
+
+            for (Map<String, PhysicalQuantity> candidate : partResult.candidates()) {
+                for (String required : partResult.requiredQuantities()) {
+                    if (!candidate.containsKey(required)) issues.add("required-result-missing:" + partIndex + ":" + required);
+                }
+                candidate.forEach((key, quantity) -> checkQuantity(quantity, "candidate:" + partIndex + ":" + key, issues));
+            }
+
+            for (ProjectileSolution.Step step : partResult.steps()) {
+                if (step.equation() == null || step.interpretationId() == null || step.interpretationId().isBlank()) {
+                    issues.add("invalid-step-metadata:" + partIndex);
+                }
+                step.substitutions().forEach((key, quantity) -> checkQuantity(quantity, "substitution:" + partIndex + ":" + key, issues));
+                step.intermediateResults().forEach((key, quantity) -> checkQuantity(quantity, "intermediate:" + partIndex + ":" + key, issues));
+                step.results().forEach((key, quantity) -> checkQuantity(quantity, "step-result:" + partIndex + ":" + key, issues));
+            }
+
+            if (!partResult.steps().isEmpty() && !partResult.candidates().isEmpty()) {
+                Map<String, PhysicalQuantity> candidate = partResult.candidates().get(0);
+                Map<String, PhysicalQuantity> results = partResult.steps().get(partResult.steps().size() - 1).results();
+                for (Map.Entry<String, PhysicalQuantity> expected : candidate.entrySet()) {
+                    PhysicalQuantity actual = results.get(expected.getKey());
+                    if (actual == null) {
+                        issues.add("candidate-not-associated-with-final-step:" + partIndex + ":" + expected.getKey());
+                    } else if (!sameQuantity(expected.getValue(), actual)) {
+                        issues.add("candidate-step-value-mismatch:" + partIndex + ":" + expected.getKey());
+                    }
+                }
+            }
+        }
+        return new Verification(issues.isEmpty(), issues);
+    }
 
     public Verification verify(ProjectileProblemSequence problem, ProjectileSequenceSolution solution) {
         List<String> issues = new ArrayList<>();

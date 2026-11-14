@@ -27,7 +27,8 @@ public record InterpretationDraft(
         CanonicalPhysicsProblem.AngleReference angleReference,
         List<CanonicalPhysicsProblem.CanonicalTarget> canonicalTargets,
         List<ExtractedConstraint> extractedConstraints,
-        List<String> unsupportedConstraints) {
+        List<String> unsupportedConstraints,
+        Map<ProjectileProblem.Input, PhysicalQuantity> sharedGivens) {
 
     public InterpretationDraft {
         if (normalizedQuestion == null || normalizedQuestion.isBlank()) {
@@ -42,6 +43,33 @@ public record InterpretationDraft(
         canonicalTargets = canonicalTargets == null ? List.of() : List.copyOf(canonicalTargets);
         extractedConstraints = extractedConstraints == null ? List.of() : List.copyOf(extractedConstraints);
         unsupportedConstraints = unsupportedConstraints == null ? List.of() : List.copyOf(unsupportedConstraints);
+        sharedGivens = sharedGivens == null ? Map.of() : Map.copyOf(sharedGivens);
+    }
+
+    /** 10-argument constructor preserving previous record signature with empty shared givens. */
+    public InterpretationDraft(
+            String normalizedQuestion,
+            List<ProblemPart> parts,
+            List<String> assumptions,
+            List<Clarification> clarifications,
+            double confidence,
+            SurfaceSpec surface,
+            CanonicalPhysicsProblem.AngleReference angleReference,
+            List<CanonicalPhysicsProblem.CanonicalTarget> canonicalTargets,
+            List<ExtractedConstraint> extractedConstraints,
+            List<String> unsupportedConstraints) {
+        this(
+                normalizedQuestion,
+                parts,
+                assumptions,
+                clarifications,
+                confidence,
+                surface,
+                angleReference,
+                canonicalTargets,
+                extractedConstraints,
+                unsupportedConstraints,
+                Map.of());
     }
 
     /** Preserves the existing five-argument interpretation constructor with safe canonical metadata defaults. */
@@ -61,7 +89,8 @@ public record InterpretationDraft(
                 CanonicalPhysicsProblem.AngleReference.HORIZONTAL,
                 List.of(),
                 List.of(),
-                List.of());
+                List.of(),
+                Map.of());
     }
 
     /** Returns an immutable copy enriched with structured surface, target, constraint, and unsupported metadata. */
@@ -81,7 +110,24 @@ public record InterpretationDraft(
                 angleReference,
                 canonicalTargets,
                 extractedConstraints,
-                unsupportedConstraints);
+                unsupportedConstraints,
+                sharedGivens);
+    }
+
+    /** Returns an immutable copy with explicit global shared givens. */
+    public InterpretationDraft withSharedGivens(Map<ProjectileProblem.Input, PhysicalQuantity> givens) {
+        return new InterpretationDraft(
+                normalizedQuestion,
+                parts,
+                assumptions,
+                clarifications,
+                confidence,
+                surface,
+                angleReference,
+                canonicalTargets,
+                extractedConstraints,
+                unsupportedConstraints,
+                givens);
     }
 
     /** Untrusted surface geometry cue extracted prior to domain validation. */
@@ -104,7 +150,8 @@ public record InterpretationDraft(
     public enum ConstraintOrigin {
         STUDENT_EXPLICIT,
         CLARIFICATION_ANSWER,
-        INTERPRETER_INFERRED
+        INTERPRETER_INFERRED,
+        PHYSORA_DEFAULT
     }
 
     public enum ConstraintResolution {

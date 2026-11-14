@@ -7,6 +7,7 @@ import edu.physics.ai.ExplanationDraft;
 import edu.physics.ai.ExplanationVerifier;
 import edu.physics.ai.InterpretationDraft;
 import edu.physics.ai.SolutionVerifier;
+import edu.physics.ai.ProblemValidationResult;
 import edu.physics.ai.ProblemValidator;
 import edu.physics.ai.SolverOrchestrator;
 import edu.physics.ai.AIProvider;
@@ -16,6 +17,7 @@ import edu.physics.ai.ProviderMode;
 import edu.physics.ai.ProviderResult;
 import edu.physics.ai.gemini.GeminiProviderConfiguration;
 import edu.physics.ai.ollama.OllamaConfiguration;
+import edu.physics.problem.CanonicalSolution;
 import edu.physics.problem.PhysicalQuantity;
 import edu.physics.problem.ProjectileSequenceSolution;
 import edu.physics.problem.ProjectileSolution;
@@ -628,14 +630,16 @@ final class AIProblemView extends BorderPane {
                 statusLabel.setText("The question has more than one plausible interpretation. Answer these before solving.");
                 showClarifications(result.validation().clarifications());
             }
+            case UNSUPPORTED_PROBLEM -> {
+                statusLabel.setText("The question contains physics capabilities not currently supported by PHYSORA.");
+                solutionOutput.setText(formatValidationErrors(result.validation()));
+            }
             case INVALID_PROBLEM -> {
                 statusLabel.setText("The interpreted problem is invalid or incomplete.");
-                solutionOutput.setText(String.join("\n", result.validation().errors()));
+                solutionOutput.setText(formatValidationErrors(result.validation()));
             }
             case SOLVER_REJECTED -> {
-                statusLabel.setText("The deterministic solver did not produce a verifiable solution.");
-                solutionOutput.setText(result.orchestration().verification() == null ? result.messageCode()
-                        : String.join("\n", result.orchestration().verification().issues()));
+                renderSolverRejection(result);
             }
             case PROVIDER_ERROR -> {
                 setError(providerMessage(result.providerError()));
@@ -711,6 +715,8 @@ final class AIProblemView extends BorderPane {
                     "Authority: PHYSORA Deterministic Physics Solver\nStatus: Not run yet — awaiting clarification (no answer generated)";
             case INVALID_PROBLEM ->
                     "Authority: PHYSORA Deterministic Physics Solver\nStatus: Not run — invalid or incomplete problem (no answer generated)";
+            case UNSUPPORTED_PROBLEM ->
+                    "Authority: PHYSORA Deterministic Physics Solver\nStatus: Not run — unsupported physics constraints (no answer generated)";
             case PROVIDER_ERROR ->
                     "Authority: PHYSORA Deterministic Physics Solver\nStatus: Not run — AI stage failed (no answer generated)";
         };
@@ -845,28 +851,119 @@ final class AIProblemView extends BorderPane {
         return cleaned;
     }
 
+    private void renderSolverRejection(AIWorkflowResult result) {
+        if (result.orchestration() == null) {
+            statusLabel.setText("The deterministic solver did not produce a verifiable solution.");
+            solutionOutput.setText(result.messageCode());
+            return;
+        }
+        CanonicalSolution canonical = result.orchestration().canonicalSolution();
+        if (canonical != null) {
+            switch (canonical.status()) {
+                case MULTIPLE_SOLUTIONS -> {
+                    statusLabel.setText("The problem has multiple valid solutions (blocked from ordinary explanation).");
+                    solutionOutput.setText(renderSolution(result));
+                }
+                case PARTIALLY_SOLVED -> {
+                    statusLabel.setText("Only some parts could be solved; an upstream failure prevented complete solution.");
+                    solutionOutput.setText(renderSolution(result));
+                }
+                case AMBIGUOUS -> {
+                    statusLabel.setText("The physical setup has multiple geometric or trigonometric ambiguities.");
+                    solutionOutput.setText(renderSolution(result));
+                }
+                case UNDERDETERMINED -> {
+                    statusLabel.setText("The problem is underdetermined; additional inputs or boundary conditions are required.");
+                    solutionOutput.setText(renderSolution(result));
+                }
+                case NO_SOLUTION -> {
+                    statusLabel.setText("No physical solution exists for the specified initial conditions and target.");
+                    solutionOutput.setText(renderSolution(result));
+                }
+                case UNBOUNDED -> {
+                    statusLabel.setText("The trajectory is unbounded; projectile never reaches the target condition.");
+                    solutionOutput.setText(renderSolution(result));
+                }
+                case UNSUPPORTED -> {
+                    statusLabel.setText("The problem requests physical targets or constraints not currently supported.");
+                    solutionOutput.setText(renderSolution(result));
+                }
+                case INVALID_INPUT -> {
+                    statusLabel.setText("The physical inputs violate domain constraints.");
+                    solutionOutput.setText(renderSolution(result));
+                }
+                default -> {
+                    statusLabel.setText("The deterministic solver did not produce a verifiable solution.");
+                    solutionOutput.setText(result.orchestration().verification() == null ? result.messageCode()
+                            : String.join("\n", result.orchestration().verification().issues()));
+                }
+            }
+            return;
+        }
+        statusLabel.setText("The deterministic solver did not produce a verifiable solution.");
+        solutionOutput.setText(result.orchestration().verification() == null ? result.messageCode()
+                : String.join("\n", result.orchestration().verification().issues()));
+    }
+
+    private static String formatValidationErrors(ProblemValidationResult validation) {
+        if (validation == null) return "";
+        List<String> items = new ArrayList<>(validation.errors());
+        if (items.isEmpty() && validation.completenessReport() != null) {
+            items.addAll(validation.completenessReport().unresolvedConditions());
+        }
+        return String.join("\n", items);
+    }
+
     private static String renderSolution(AIWorkflowResult result) {
         StringBuilder text = new StringBuilder();
         text.append("Original question\n").append(result.originalQuestion()).append("\n\n");
         text.append("Assumptions\n");
-        result.validation().assumptions().forEach(value -> text.append("• ").append(value).append('\n'));
-        for (ProjectileSequenceSolution.PartResult part : result.orchestration().solution().completedParts()) {
-            ProjectileSolution solution = part.solution();
-            text.append("\nPart ").append(part.index() + 1).append(" — ").append(solution.target())
-                    .append(" [").append(solution.status()).append("]\n");
-            solution.steps().forEach(step -> {
-                text.append(step.equation().render()).append('\n');
-                step.substitutions().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                        text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
-                step.intermediateResults().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                        text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append(" (intermediate)\n"));
-                step.results().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                        text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
-            });
-            for (int candidateIndex = 0; candidateIndex < solution.candidates().size(); candidateIndex++) {
-                text.append("Candidate ").append(candidateIndex + 1).append('\n');
-                solution.candidates().get(candidateIndex).entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                        text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+        if (result.validation() != null) {
+            result.validation().assumptions().forEach(value -> text.append("• ").append(value).append('\n'));
+        }
+        if (result.orchestration() != null && result.orchestration().canonicalSolution() != null) {
+            CanonicalSolution canonical = result.orchestration().canonicalSolution();
+            for (CanonicalSolution.PartResult part : canonical.partResults()) {
+                text.append("\nPart ").append(part.partIndex() + 1).append(" — ").append(part.target().name())
+                        .append(" [").append(part.status()).append("]\n");
+                part.steps().forEach(step -> {
+                    text.append(step.equation().render()).append('\n');
+                    step.substitutions().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
+                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                    step.intermediateResults().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
+                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append(" (intermediate)\n"));
+                    step.results().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
+                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                });
+                for (int candidateIndex = 0; candidateIndex < part.candidates().size(); candidateIndex++) {
+                    text.append("Candidate ").append(candidateIndex + 1).append('\n');
+                    part.candidates().get(candidateIndex).entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
+                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                }
+                if (!part.diagnostics().isEmpty()) {
+                    text.append("Diagnostics:\n");
+                    part.diagnostics().forEach(d -> text.append("  • ").append(d).append('\n'));
+                }
+            }
+        } else if (result.orchestration() != null && result.orchestration().solution() != null) {
+            for (ProjectileSequenceSolution.PartResult part : result.orchestration().solution().completedParts()) {
+                ProjectileSolution solution = part.solution();
+                text.append("\nPart ").append(part.index() + 1).append(" — ").append(solution.target())
+                        .append(" [").append(solution.status()).append("]\n");
+                solution.steps().forEach(step -> {
+                    text.append(step.equation().render()).append('\n');
+                    step.substitutions().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
+                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                    step.intermediateResults().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
+                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append(" (intermediate)\n"));
+                    step.results().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
+                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                });
+                for (int candidateIndex = 0; candidateIndex < solution.candidates().size(); candidateIndex++) {
+                    text.append("Candidate ").append(candidateIndex + 1).append('\n');
+                    solution.candidates().get(candidateIndex).entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
+                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                }
             }
         }
         if (result.explanation() != null) {
@@ -877,7 +974,7 @@ final class AIProblemView extends BorderPane {
                     text.append("• ").append(claim.text());
                     if (claim.resultKey() != null) {
                         text.append(" [verified result: ").append(claim.resultKey()).append(" = ")
-                                .append(findResult(result.orchestration().solution(), claim.resultKey())).append(']');
+                                .append(findResult(result.orchestration(), claim.resultKey())).append(']');
                     }
                     text.append('\n');
                 }
@@ -886,19 +983,38 @@ final class AIProblemView extends BorderPane {
         return text.toString();
     }
 
-    private static String findResult(ProjectileSequenceSolution solution, String key) {
-        for (ProjectileSequenceSolution.PartResult part : solution.completedParts()) {
-            for (Map<String, PhysicalQuantity> candidate : part.solution().candidates()) {
-                PhysicalQuantity value = candidate.get(key);
-                if (value != null) return format(value);
+    private static String findResult(SolverOrchestrator.OrchestrationResult orchestration, String key) {
+        if (orchestration == null) return "unavailable";
+        if (orchestration.canonicalSolution() != null) {
+            for (CanonicalSolution.PartResult part : orchestration.canonicalSolution().partResults()) {
+                for (Map<String, PhysicalQuantity> candidate : part.candidates()) {
+                    PhysicalQuantity value = candidate.get(key);
+                    if (value != null) return format(value);
+                }
+                for (var step : part.steps()) {
+                    PhysicalQuantity value = step.results().get(key);
+                    if (value != null) return format(value);
+                    value = step.intermediateResults().get(key);
+                    if (value != null) return format(value);
+                    value = step.substitutions().get(key);
+                    if (value != null) return format(value);
+                }
             }
-            for (var step : part.solution().steps()) {
-                PhysicalQuantity value = step.results().get(key);
-                if (value != null) return format(value);
-                value = step.intermediateResults().get(key);
-                if (value != null) return format(value);
-                value = step.substitutions().get(key);
-                if (value != null) return format(value);
+        }
+        if (orchestration.solution() != null) {
+            for (ProjectileSequenceSolution.PartResult part : orchestration.solution().completedParts()) {
+                for (Map<String, PhysicalQuantity> candidate : part.solution().candidates()) {
+                    PhysicalQuantity value = candidate.get(key);
+                    if (value != null) return format(value);
+                }
+                for (var step : part.solution().steps()) {
+                    PhysicalQuantity value = step.results().get(key);
+                    if (value != null) return format(value);
+                    value = step.intermediateResults().get(key);
+                    if (value != null) return format(value);
+                    value = step.substitutions().get(key);
+                    if (value != null) return format(value);
+                }
             }
         }
         return "unavailable";
