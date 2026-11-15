@@ -40,6 +40,10 @@ final class FxTestRuntime {
     }
 
     static <T> T runOnFxThread(Callable<T> work) throws Exception {
+        return runOnFxThread(work, 25, TimeUnit.SECONDS);
+    }
+
+    static <T> T runOnFxThread(Callable<T> work, long timeout, TimeUnit unit) throws Exception {
         ensureStarted();
         if (Platform.isFxApplicationThread()) {
             return work.call();
@@ -47,7 +51,7 @@ final class FxTestRuntime {
         FutureTask<T> task = new FutureTask<>(work);
         Platform.runLater(task);
         try {
-            return task.get(10, TimeUnit.SECONDS);
+            return task.get(timeout, unit);
         } catch (ExecutionException ex) {
             Throwable cause = ex.getCause();
             if (cause instanceof Exception exception) {

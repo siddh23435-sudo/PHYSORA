@@ -34,6 +34,7 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -88,6 +89,18 @@ final class AIProblemView extends BorderPane {
     private final Button submitButton = new Button("INTERPRET AND SOLVE");
     private final Button answerButton = new Button("SUBMIT CLARIFICATION");
     private final Button cancelButton = new Button("CANCEL REQUEST");
+    private final Button useExperimentButton = new Button("⚗  USE CURRENT EXPERIMENT");
+    private final VBox experimentContextCard = new VBox(5);
+    private final Label experimentContextTitle = new Label();
+    private final Label experimentContextSummary = new Label();
+    private final Label experimentContextSolver = new Label();
+    private final Button refreshExperimentButton = new Button("↺  REFRESH");
+    private final Button clearExperimentButton = new Button("✕  CLEAR");
+    private final Label staleWarningLabel = new Label("⚠ Active simulation parameters have been modified since this snapshot was captured. Click [↺ REFRESH] to update.");
+    private final FlowPane promptChipsPane = new FlowPane(6, 6);
+    private Supplier<ExperimentSnapshot> experimentSnapshotSupplier;
+    private ExperimentSnapshot activeSnapshot;
+    private boolean isContextStale;
     private AIConversationService conversationService;
     private AIProvider provider;
     private UUID sessionId;
@@ -161,6 +174,12 @@ final class AIProblemView extends BorderPane {
         questionInput.setMinHeight(58);
         questionInput.setPrefHeight(60);
 
+        useExperimentButton.setId("useCurrentExperimentButton");
+        useExperimentButton.getStyleClass().add("transport-secondary");
+        useExperimentButton.setOnAction(event -> attachCurrentExperiment());
+
+        buildExperimentContextCard();
+
         submitButton.setId("aiSubmitButton");
         submitButton.getStyleClass().add("transport-primary");
         submitButton.setOnAction(event -> submitQuestion());
@@ -173,7 +192,7 @@ final class AIProblemView extends BorderPane {
         answerButton.setOnAction(event -> submitClarification());
         answerButton.setVisible(false);
         answerButton.setManaged(false);
-        HBox actions = new HBox(9, submitButton, answerButton, cancelButton);
+        HBox actions = new HBox(9, submitButton, useExperimentButton, answerButton, cancelButton);
         actions.setAlignment(Pos.CENTER_LEFT);
 
         statusLabel.setId("aiStatus");
@@ -190,11 +209,11 @@ final class AIProblemView extends BorderPane {
         solutionOutput.setId("aiSolutionOutput");
         solutionOutput.setEditable(false);
         solutionOutput.setWrapText(true);
-        solutionOutput.setPrefRowCount(7);
-        solutionOutput.setMinHeight(85);
+        solutionOutput.setPrefRowCount(9);
+        solutionOutput.setMinHeight(110);
         solutionOutput.getStyleClass().add("ai-solution-output");
 
-        VBox inputSection = new VBox(5, eyebrow("PROBLEM INPUT"), questionInput, actions, statusLabel, clarificationBox);
+        VBox inputSection = new VBox(6, eyebrow("PROBLEM INPUT"), experimentContextCard, questionInput, actions, statusLabel, clarificationBox);
         inputSection.getStyleClass().add("ai-input-section");
         inputSection.setPadding(new Insets(8, 10, 8, 10));
         VBox resultSection = new VBox(5, eyebrow("VERIFIED SOLUTION"), attributionPanel, solutionOutput);
@@ -467,9 +486,142 @@ final class AIProblemView extends BorderPane {
         };
     }
 
+    private void buildExperimentContextCard() {
+        experimentContextCard.setId("experimentContextCard");
+        experimentContextCard.setVisible(false);
+        experimentContextCard.setManaged(false);
+        experimentContextCard.setStyle("-fx-background-color: #f0eddf; -fx-padding: 8 10 8 10; " +
+                "-fx-border-color: #2453d4; -fx-border-width: 1 1 1 2; -fx-background-radius: 2px;");
+
+        experimentContextTitle.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #2453d4;");
+        experimentContextSummary.setStyle("-fx-font-family: Consolas; -fx-font-size: 10.5px; -fx-text-fill: #142e4b;");
+        experimentContextSolver.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; -fx-text-fill: #556270;");
+
+        refreshExperimentButton.setId("refreshExperimentContextButton");
+        refreshExperimentButton.getStyleClass().add("transport-secondary");
+        refreshExperimentButton.setStyle("-fx-font-size: 9px; -fx-padding: 3 7 3 7;");
+        refreshExperimentButton.setOnAction(event -> attachCurrentExperiment());
+
+        clearExperimentButton.setId("clearExperimentContextButton");
+        clearExperimentButton.getStyleClass().add("transport-secondary");
+        clearExperimentButton.setStyle("-fx-font-size: 9px; -fx-padding: 3 7 3 7;");
+        clearExperimentButton.setOnAction(event -> clearExperimentContext());
+
+        HBox cardHeader = new HBox(8, experimentContextTitle, spacer(), refreshExperimentButton, clearExperimentButton);
+        cardHeader.setAlignment(Pos.CENTER_LEFT);
+
+        staleWarningLabel.setId("experimentContextStaleWarning");
+        staleWarningLabel.setVisible(false);
+        staleWarningLabel.setManaged(false);
+
+        buildPromptChips();
+
+        experimentContextCard.getChildren().addAll(cardHeader, experimentContextSummary, experimentContextSolver, staleWarningLabel, promptChipsPane);
+    }
+
+    private void buildPromptChips() {
+        promptChipsPane.getChildren().clear();
+        Label chipHeader = new Label("Quick Inquiries:");
+        chipHeader.setStyle("-fx-font-size: 9.5px; -fx-text-fill: #66707a; -fx-font-weight: bold;");
+        promptChipsPane.getChildren().add(chipHeader);
+
+        List<String> prompts = List.of(
+                "Explain why this projectile reaches this height.",
+                "What happens if I increase the launch angle?",
+                "Why does horizontal velocity remain constant?",
+                "Generate a JEE Main question using this experiment.",
+                "Generate a challenging JEE Advanced question based on this setup."
+        );
+        for (String p : prompts) {
+            Button chip = new Button(p);
+            chip.getStyleClass().add("prompt-chip-btn");
+            chip.setStyle("-fx-font-size: 9.5px; -fx-padding: 3 8 3 8; -fx-background-color: #e9e2d0; " +
+                    "-fx-text-fill: #142e4b; -fx-border-color: #cbc4b4; -fx-border-radius: 2px; -fx-cursor: hand;");
+            chip.setOnAction(e -> {
+                questionInput.setText(p);
+                questionInput.requestFocus();
+                questionInput.positionCaret(p.length());
+            });
+            promptChipsPane.getChildren().add(chip);
+        }
+    }
+
+    void setExperimentSnapshotSupplier(Supplier<ExperimentSnapshot> supplier) {
+        this.experimentSnapshotSupplier = supplier;
+    }
+
+    void attachCurrentExperiment() {
+        if (experimentSnapshotSupplier == null) return;
+        activeSnapshot = experimentSnapshotSupplier.get();
+        isContextStale = false;
+        if (activeSnapshot != null) {
+            updateExperimentContextDisplay();
+            setStatus("Active experiment attached. Prompt context updated.", false);
+        }
+    }
+
+    void clearExperimentContext() {
+        activeSnapshot = null;
+        isContextStale = false;
+        updateExperimentContextDisplay();
+        setStatus("Experiment context detached.", false);
+    }
+
+    void notifySimulationParametersChanged() {
+        if (activeSnapshot == null || experimentSnapshotSupplier == null) return;
+        ExperimentSnapshot latest = experimentSnapshotSupplier.get();
+        if (latest == null) return;
+        boolean matches = Math.abs(latest.initialSpeed() - activeSnapshot.initialSpeed()) < 1e-4
+                && Math.abs(latest.launchAngleDegrees() - activeSnapshot.launchAngleDegrees()) < 1e-4
+                && Math.abs(latest.gravity() - activeSnapshot.gravity()) < 1e-4
+                && Math.abs(latest.initialX() - activeSnapshot.initialX()) < 1e-4
+                && Math.abs(latest.initialY() - activeSnapshot.initialY()) < 1e-4
+                && Math.abs(latest.landingY() - activeSnapshot.landingY()) < 1e-4;
+        if (!matches && !isContextStale) {
+            isContextStale = true;
+            updateExperimentContextDisplay();
+        }
+    }
+
+    boolean isContextStale() {
+        return isContextStale;
+    }
+
+    private void updateExperimentContextDisplay() {
+        if (activeSnapshot == null) {
+            experimentContextCard.setVisible(false);
+            experimentContextCard.setManaged(false);
+            return;
+        }
+        if (isContextStale) {
+            experimentContextCard.setStyle("-fx-background-color: #fdfaf0; -fx-padding: 8 10 8 10; " +
+                    "-fx-border-color: #b45309; -fx-border-width: 1 1 1 3; -fx-background-radius: 2px;");
+            experimentContextTitle.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #b45309;");
+            experimentContextTitle.setText("ATTACHED EXPERIMENT CONTEXT · STALE (Parameters modified) · " + activeSnapshot.chapterTitle().toUpperCase());
+            staleWarningLabel.setStyle("-fx-font-family: Consolas; -fx-font-size: 9.5px; -fx-text-fill: #92400e; -fx-font-weight: bold; -fx-padding: 2 0 2 0;");
+            staleWarningLabel.setVisible(true);
+            staleWarningLabel.setManaged(true);
+        } else {
+            experimentContextCard.setStyle("-fx-background-color: #f0eddf; -fx-padding: 8 10 8 10; " +
+                    "-fx-border-color: #2453d4; -fx-border-width: 1 1 1 2; -fx-background-radius: 2px;");
+            experimentContextTitle.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #2453d4;");
+            experimentContextTitle.setText("ATTACHED EXPERIMENT CONTEXT · CURRENT · " + activeSnapshot.chapterTitle().toUpperCase() + " (" + activeSnapshot.simulationStatus() + ")");
+            staleWarningLabel.setVisible(false);
+            staleWarningLabel.setManaged(false);
+        }
+        experimentContextSummary.setText(activeSnapshot.formatSummary());
+        experimentContextSolver.setText(activeSnapshot.formatSolverResults());
+        experimentContextCard.setVisible(true);
+        experimentContextCard.setManaged(true);
+    }
+
+    ExperimentSnapshot activeExperimentSnapshot() {
+        return activeSnapshot;
+    }
+
     private void submitQuestion() {
-        String question = questionInput.getText() == null ? "" : questionInput.getText().trim();
-        if (question.isBlank()) {
+        String rawQuestion = questionInput.getText() == null ? "" : questionInput.getText().trim();
+        if (rawQuestion.isBlank()) {
             setError("Enter a question before submitting.");
             return;
         }
@@ -478,10 +630,21 @@ final class AIProblemView extends BorderPane {
         }
         setBusy(true, "Interpreting and solving… please wait");
         viewRevision++;
+
+        String questionToSend;
+        if (activeSnapshot != null) {
+            String staleNote = isContextStale
+                    ? "\n[NOTE: This snapshot was captured prior to recent parameter edits in the experiment bench.]\n"
+                    : "";
+            questionToSend = activeSnapshot.toPromptContext() + staleNote + "\n\n[STUDENT INQUIRY]\n" + rawQuestion;
+        } else {
+            questionToSend = rawQuestion;
+        }
+
         if (sessionId == null) {
             AIConversationService.Submission submission;
             try {
-                submission = conversationService.submit(question);
+                submission = conversationService.submit(questionToSend);
             } catch (RuntimeException ex) {
                 setBusy(false, "");
                 setError("Could not start the problem-solving request.");
@@ -491,7 +654,7 @@ final class AIProblemView extends BorderPane {
             observe(submission.completion(), viewRevision);
         } else {
             try {
-                observe(conversationService.revise(sessionId, question), viewRevision);
+                observe(conversationService.revise(sessionId, questionToSend), viewRevision);
             } catch (RuntimeException ex) {
                 setBusy(false, "");
                 setError("Could not update the problem-solving request.");
@@ -914,9 +1077,38 @@ final class AIProblemView extends BorderPane {
         return String.join("\n", items);
     }
 
-    private static String renderSolution(AIWorkflowResult result) {
+    private String renderSolution(AIWorkflowResult result) {
         StringBuilder text = new StringBuilder();
-        text.append("Original question\n").append(result.originalQuestion()).append("\n\n");
+        if (activeSnapshot != null) {
+            text.append("=== PARAMETER & CONTEXT DISTINCTION ===\n");
+            String resultsSummary = extractResultsSummary(result);
+            if (!resultsSummary.isEmpty()) {
+                text.append("• Verified Deterministic Output: ").append(resultsSummary).append("\n");
+            }
+            if (result != null && result.validation() != null && result.validation().canonicalProblem() != null) {
+                var prob = result.validation().canonicalProblem();
+                double qV0 = prob.derivedInitialSpeed().orElse(0.0);
+                double qAngle = prob.derivedLaunchAngleDegrees().orElse(0.0);
+                double qG = prob.gravity().orElse(9.8);
+                text.append(String.format(Locale.ROOT,
+                        "• Question Parameters Applied: v0 = %.2f m/s, theta = %.1f deg, g = %.2f m/s²\n",
+                        qV0, qAngle, qG));
+            } else {
+                double solvedG = extractGravityValue(result);
+                text.append(String.format(Locale.ROOT,
+                        "• Question Parameters Applied: g = %.2f m/s²\n",
+                        solvedG));
+            }
+            text.append(String.format(Locale.ROOT,
+                    "• Attached Bench Context (Preserved): v0 = %.2f m/s, theta = %.1f deg, g = %.2f m/s² (H_max = %.2f m, Range = %.2f m)\n",
+                    activeSnapshot.initialSpeed(),
+                    activeSnapshot.launchAngleDegrees(),
+                    activeSnapshot.gravity(),
+                    activeSnapshot.maximumHeight().orElse(0.0),
+                    activeSnapshot.horizontalRange().orElse(0.0)));
+            text.append("----------------------------------------------------------------------\n\n");
+        }
+        text.append("Original question\n").append(cleanQuestionDisplay(result.originalQuestion())).append("\n\n");
         text.append("Assumptions\n");
         if (result.validation() != null) {
             result.validation().assumptions().forEach(value -> text.append("• ").append(value).append('\n'));
@@ -1024,6 +1216,56 @@ final class AIProblemView extends BorderPane {
         return String.format(java.util.Locale.ROOT, "%.6g %s", quantity.value(), quantity.unit().symbol());
     }
 
+    private static String cleanQuestionDisplay(String question) {
+        if (question == null) return "";
+        int inquiryMarker = question.indexOf("[STUDENT INQUIRY]");
+        if (inquiryMarker >= 0) {
+            return question.substring(inquiryMarker + "[STUDENT INQUIRY]".length()).trim();
+        }
+        return question;
+    }
+
+    private static double extractGravityValue(AIWorkflowResult result) {
+        if (result != null && result.validation() != null && result.validation().canonicalProblem() != null) {
+            java.util.OptionalDouble g = result.validation().canonicalProblem().gravity();
+            if (g.isPresent()) return g.getAsDouble();
+        }
+        return 9.8;
+    }
+
+    private static String extractResultsSummary(AIWorkflowResult result) {
+        if (result == null || result.orchestration() == null) return "";
+        List<String> formatted = new ArrayList<>();
+        if (result.orchestration().canonicalSolution() != null) {
+            for (var part : result.orchestration().canonicalSolution().partResults()) {
+                for (var step : part.steps()) {
+                    for (var entry : step.results().entrySet()) {
+                        String name = formatTargetName(entry.getKey());
+                        formatted.add(name + " = " + format(entry.getValue()));
+                    }
+                }
+            }
+        } else if (result.orchestration().solution() != null) {
+            for (var part : result.orchestration().solution().completedParts()) {
+                for (var step : part.solution().steps()) {
+                    for (var entry : step.results().entrySet()) {
+                        String name = formatTargetName(entry.getKey());
+                        formatted.add(name + " = " + format(entry.getValue()));
+                    }
+                }
+            }
+        }
+        return String.join("  |  ", formatted);
+    }
+
+    private static String formatTargetName(String key) {
+        if ("maximumHeight".equalsIgnoreCase(key)) return "H_max (Maximum Height)";
+        if ("range".equalsIgnoreCase(key)) return "R (Horizontal Range)";
+        if ("flightTime".equalsIgnoreCase(key) || "totalFlightTime".equalsIgnoreCase(key)) return "T (Total Flight Time)";
+        if ("apexTime".equalsIgnoreCase(key) || "timeToApex".equalsIgnoreCase(key)) return "t_apex (Time to Apex)";
+        return key;
+    }
+
     private void showClarifications(List<InterpretationDraft.Clarification> questions) {
         clarificationFields.getChildren().clear();
         for (int index = 0; index < questions.size(); index++) {
@@ -1123,5 +1365,11 @@ final class AIProblemView extends BorderPane {
         } finally {
             if (providerToClose != null) providerToClose.close();
         }
+    }
+
+    private static Region spacer() {
+        Region region = new Region();
+        HBox.setHgrow(region, Priority.ALWAYS);
+        return region;
     }
 }

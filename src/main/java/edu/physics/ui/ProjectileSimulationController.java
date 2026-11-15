@@ -5,10 +5,12 @@ import javafx.animation.AnimationTimer;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 
+import java.util.Optional;
 import java.util.OptionalDouble;
 
 /** Shares one analytical model and one simulation clock between all bench views. */
@@ -18,6 +20,28 @@ final class ProjectileSimulationController {
     static final double DEFAULT_LAUNCH_SPEED = 20.0;
     static final double DEFAULT_LAUNCH_ANGLE = 45.0;
     static final double DEFAULT_GRAVITY = 9.81;
+
+    /**
+     * Deterministic simulation status reflecting the physical and clock state of the model.
+     */
+    public enum SimulationStatus {
+        READY("READY", "Simulation ready for launch"),
+        PLAYING("PLAYING", "Trajectory in motion"),
+        PAUSED("PAUSED", "Simulation paused"),
+        AT_APEX("AT APEX", "Projectile at peak altitude"),
+        LANDED("LANDED", "Projectile reached landing surface");
+
+        private final String label;
+        private final String description;
+
+        SimulationStatus(String label, String description) {
+            this.label = label;
+            this.description = description;
+        }
+
+        public String label() { return label; }
+        public String description() { return description; }
+    }
 
     private final DoubleProperty launchSpeed = new SimpleDoubleProperty(DEFAULT_LAUNCH_SPEED);
     private final DoubleProperty launchAngle = new SimpleDoubleProperty(DEFAULT_LAUNCH_ANGLE);
@@ -29,6 +53,7 @@ final class ProjectileSimulationController {
     private final DoubleProperty playbackSpeed = new SimpleDoubleProperty(1.0);
     private final BooleanProperty playing = new SimpleBooleanProperty(false);
     private final ObjectProperty<ProjectileMotion> model = new SimpleObjectProperty<>();
+    private final SimpleObjectProperty<SimulationStatus> status = new SimpleObjectProperty<>(SimulationStatus.READY);
     private boolean restoringDefaults;
 
     private long previousFrameNanos;
@@ -52,6 +77,11 @@ final class ProjectileSimulationController {
         initialX.addListener((obs, oldValue, newValue) -> rebuildWhenActive());
         initialY.addListener((obs, oldValue, newValue) -> rebuildWhenActive());
         landingY.addListener((obs, oldValue, newValue) -> rebuildWhenActive());
+
+        simulationTime.addListener((obs, oldValue, newValue) -> updateStatus());
+        playing.addListener((obs, oldValue, newValue) -> updateStatus());
+        model.addListener((obs, oldValue, newValue) -> updateStatus());
+
         rebuildModel();
     }
 
@@ -64,6 +94,41 @@ final class ProjectileSimulationController {
         model.set(new ProjectileMotion(launchSpeed.get(), launchAngle.get(), gravity.get(),
                 initialX.get(), initialY.get(), landingY.get()));
         simulationTime.set(0.0);
+        updateStatus();
+    }
+
+    private void updateStatus() {
+        ProjectileMotion m = model.get();
+        if (m == null) {
+            status.set(SimulationStatus.READY);
+            return;
+        }
+        double t = simulationTime.get();
+        OptionalDouble flightTime = m.timeOfFlight();
+        boolean hasLanded = flightTime.isPresent() && flightTime.getAsDouble() > 0.0
+                && t >= (flightTime.getAsDouble() - 1e-4);
+
+        if (hasLanded) {
+            status.set(SimulationStatus.LANDED);
+            return;
+        }
+
+        // Apex occurs when vy = 0 -> timeToApex()
+        OptionalDouble apexTime = m.timeToApex();
+        boolean isAtApex = apexTime.isPresent() && Math.abs(t - apexTime.getAsDouble()) <= 0.02;
+
+        if (isAtApex) {
+            status.set(SimulationStatus.AT_APEX);
+            return;
+        }
+
+        if (playing.get()) {
+            status.set(SimulationStatus.PLAYING);
+        } else if (t <= 1e-6) {
+            status.set(SimulationStatus.READY);
+        } else {
+            status.set(SimulationStatus.PAUSED);
+        }
     }
 
     void play() {
@@ -85,7 +150,19 @@ final class ProjectileSimulationController {
         playing.set(false);
     }
 
-    void reset() {
+    /**
+     * Non-destructive playback restart: rewinds display time to zero while strictly
+     * preserving all student-selected parameters (speed, angle, gravity, coordinates, rate).
+     */
+    void restartAnimation() {
+        pause();
+        simulationTime.set(0.0);
+    }
+
+    /**
+     * Restores factory defaults for all parameters and resets the simulation.
+     */
+    void restoreDefaults() {
         pause();
         restoringDefaults = true;
         launchSpeed.set(DEFAULT_LAUNCH_SPEED);
@@ -98,6 +175,13 @@ final class ProjectileSimulationController {
         restoringDefaults = false;
         rebuildModel();
         simulationTime.set(0.0);
+    }
+
+    /**
+     * Backward-compatible delegate to {@link #restoreDefaults()}.
+     */
+    void reset() {
+        restoreDefaults();
     }
 
     /** Advances display time only; the analytical model remains the source of physical state. */
@@ -121,6 +205,22 @@ final class ProjectileSimulationController {
         simulationTime.set(bounded);
     }
 
+    void seekToApex() {
+        pause();
+        ProjectileMotion m = model.get();
+        if (m != null) {
+            m.timeToApex().ifPresent(this::seek);
+        }
+    }
+
+    void seekToLanding() {
+        pause();
+        ProjectileMotion m = model.get();
+        if (m != null && m.timeOfFlight().isPresent()) {
+            seek(m.timeOfFlight().getAsDouble());
+        }
+    }
+
     double timelineDuration() {
         OptionalDouble flightTime = model.get().timeOfFlight();
         return flightTime.isPresent() && flightTime.getAsDouble() > 0.0
@@ -142,4 +242,6 @@ final class ProjectileSimulationController {
     BooleanProperty playingProperty() { return playing; }
     ObjectProperty<ProjectileMotion> modelProperty() { return model; }
     ProjectileMotion model() { return model.get(); }
+    ReadOnlyObjectProperty<SimulationStatus> statusProperty() { return status; }
+    SimulationStatus status() { return status.get(); }
 }

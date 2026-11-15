@@ -1,6 +1,7 @@
 package edu.physics.ui;
 
 import edu.physics.projectile.ProjectileMotion;
+import javafx.event.ActionEvent;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
@@ -10,6 +11,8 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -191,7 +194,7 @@ class ProjectileSimulationControllerTest {
             Label error = node(root, "initialXInputError", Label.class);
             assertTrue(error.isVisible());
             assertTrue(error.getText().contains("finite number"));
-            node(root, "resetButton", Button.class).fire();
+            node(root, "restoreDefaultsButton", Button.class).fire();
             assertEquals("0.00", initialX.getText());
             assertFalse(error.isVisible());
             initialX.setText("3.5");
@@ -243,6 +246,14 @@ class ProjectileSimulationControllerTest {
             node(root, "launchSpeedSlider", Slider.class).setValue(30.0);
             node(root, "initialXInput", TextField.class).setText("8");
             reset.fire();
+            assertEquals(0.0, shell.controller().simulationTimeProperty().get(), 0.0);
+            assertFalse(shell.controller().playingProperty().get());
+            assertEquals(30.0, shell.controller().launchSpeedProperty().get(), 0.0);
+            assertEquals(8.0, shell.controller().initialXProperty().get(), 0.0);
+            assertEquals("8.00", node(root, "initialXInput", TextField.class).getText());
+
+            Button restoreDefaults = node(root, "restoreDefaultsButton", Button.class);
+            restoreDefaults.fire();
             assertEquals(ProjectileSimulationController.DEFAULT_LAUNCH_SPEED,
                     shell.controller().launchSpeedProperty().get(), 0.0);
             assertEquals(ProjectileSimulationController.DEFAULT_LAUNCH_ANGLE,
@@ -320,6 +331,109 @@ class ProjectileSimulationControllerTest {
         try (var images = Files.list(output)) {
             assertEquals(7, images.filter(path -> path.getFileName().toString().endsWith(".png")).count());
         }
+    }
+
+    @Test
+    void restartAnimationPreservesParametersWhileRestoreDefaultsResetsThem() throws Exception {
+        runOnFxThread(() -> {
+            ProjectileSimulationController controller = new ProjectileSimulationController();
+            controller.launchSpeedProperty().set(32.5);
+            controller.launchAngleProperty().set(60.0);
+            controller.gravityProperty().set(14.2);
+            controller.initialXProperty().set(5.0);
+            controller.initialYProperty().set(8.0);
+            controller.landingYProperty().set(2.0);
+            controller.playbackSpeedProperty().set(2.0);
+
+            controller.play();
+            controller.advanceByElapsedSeconds(0.8);
+            assertTrue(controller.simulationTimeProperty().get() > 0.0);
+            assertTrue(controller.playingProperty().get());
+
+            // Non-destructive restart
+            controller.restartAnimation();
+            assertEquals(0.0, controller.simulationTimeProperty().get(), 0.0);
+            assertFalse(controller.playingProperty().get());
+            assertEquals(32.5, controller.launchSpeedProperty().get(), 0.0);
+            assertEquals(60.0, controller.launchAngleProperty().get(), 0.0);
+            assertEquals(14.2, controller.gravityProperty().get(), 0.0);
+            assertEquals(5.0, controller.initialXProperty().get(), 0.0);
+            assertEquals(8.0, controller.initialYProperty().get(), 0.0);
+            assertEquals(2.0, controller.landingYProperty().get(), 0.0);
+            assertEquals(2.0, controller.playbackSpeedProperty().get(), 0.0);
+            assertEquals(8.0, controller.model().stateAt(0.0).y(), 0.0);
+
+            // Restore defaults
+            controller.restoreDefaults();
+            assertEquals(ProjectileSimulationController.DEFAULT_LAUNCH_SPEED, controller.launchSpeedProperty().get(), 0.0);
+            assertEquals(ProjectileSimulationController.DEFAULT_LAUNCH_ANGLE, controller.launchAngleProperty().get(), 0.0);
+            assertEquals(ProjectileSimulationController.DEFAULT_GRAVITY, controller.gravityProperty().get(), 0.0);
+            assertEquals(0.0, controller.initialXProperty().get(), 0.0);
+            assertEquals(0.0, controller.initialYProperty().get(), 0.0);
+            assertEquals(0.0, controller.landingYProperty().get(), 0.0);
+            assertEquals(1.0, controller.playbackSpeedProperty().get(), 0.0);
+            assertEquals(0.0, controller.simulationTimeProperty().get(), 0.0);
+            assertFalse(controller.playingProperty().get());
+
+            controller.dispose();
+            return null;
+        });
+    }
+
+    @Test
+    void numericInputEnterAndFocusLossCommitWhileEscapeReverts() throws Exception {
+        withApplication((stage, shell, root) -> {
+            TextField initialX = node(root, "initialXInput", TextField.class);
+            TextField initialY = node(root, "initialYInput", TextField.class);
+
+            // 1. Enter commits when focused
+            initialX.requestFocus();
+            assertTrue(initialX.isFocused());
+            initialX.setText("15.5");
+            // Model should not be updated yet while user is typing in focused field
+            assertEquals(0.0, shell.controller().initialXProperty().get(), 0.0);
+            // Simulate pressing Enter
+            initialX.fireEvent(new ActionEvent());
+            assertEquals(15.5, shell.controller().initialXProperty().get(), 0.0);
+            assertEquals("15.50", initialX.getText());
+
+            // 2. Focus loss commits
+            initialY.requestFocus();
+            assertTrue(initialY.isFocused());
+            initialY.setText("9.75");
+            assertEquals(0.0, shell.controller().initialYProperty().get(), 0.0);
+            // Switch focus away
+            initialX.requestFocus();
+            assertFalse(initialY.isFocused());
+            assertEquals(9.75, shell.controller().initialYProperty().get(), 0.0);
+            assertEquals("9.75", initialY.getText());
+
+            // 3. Escape reverts to last valid property value
+            initialY.requestFocus();
+            initialY.setText("99.9");
+            KeyEvent escEvent = new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false);
+            initialY.fireEvent(escEvent);
+            assertEquals("9.75", initialY.getText());
+            assertEquals(9.75, shell.controller().initialYProperty().get(), 0.0);
+
+            // 4. Invalid input does not corrupt model property
+            initialY.setText("not-a-number");
+            initialY.fireEvent(new ActionEvent());
+            assertEquals(9.75, shell.controller().initialYProperty().get(), 0.0);
+            assertTrue(initialY.getStyleClass().contains("input-invalid"));
+
+            return null;
+        });
+    }
+
+    @Test
+    void fitTrajectoryButtonTriggersRedrawWithoutThrowing() throws Exception {
+        withApplication((stage, shell, root) -> {
+            Button fitBtn = node(root, "fitTrajectoryButton", Button.class);
+            assertNotNull(fitBtn);
+            assertDoesNotThrow(fitBtn::fire);
+            return null;
+        });
     }
 
     private static void capture(Parent root, Path target) throws IOException {
