@@ -9,12 +9,14 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -66,6 +68,7 @@ public final class RiverBoatWorkbenchView extends BorderPane {
 
     private final Button returnButton = new Button("⚗ RETURN TO KINEMATICS");
     private Runnable onReturnToKinematics;
+    private VBox sidebar;
 
     private boolean updatingSlidersFromModel = false;
 
@@ -74,7 +77,7 @@ public final class RiverBoatWorkbenchView extends BorderPane {
 
         setId("riverBoatWorkbenchView");
         setStyle("-fx-background-color: #f5f1e5;");
-        setPadding(new Insets(16, 24, 16, 24));
+        setPadding(new Insets(10, 16, 10, 16));
 
         setTop(buildTopBar());
         setCenter(buildCenterArea());
@@ -94,6 +97,22 @@ public final class RiverBoatWorkbenchView extends BorderPane {
         return returnButton;
     }
 
+    public RiverBoatVelocityPane velocityPane() {
+        return velocityPane;
+    }
+
+    @Override
+    public javafx.scene.Node lookup(String selector) {
+        javafx.scene.Node found = super.lookup(selector);
+        if (found != null) {
+            return found;
+        }
+        if (sidebar != null) {
+            return sidebar.lookup(selector);
+        }
+        return null;
+    }
+
     public void setOnReturnToKinematics(Runnable callback) {
         this.onReturnToKinematics = callback;
     }
@@ -108,7 +127,7 @@ public final class RiverBoatWorkbenchView extends BorderPane {
         eyebrow.setTextFill(PhysoraTheme.MUTED);
 
         Label title = new Label("RIVER-BOAT VECTOR CROSSING & PURSUIT DYNAMICS");
-        title.setFont(Font.font("Georgia", FontWeight.BOLD, 22));
+        title.setFont(Font.font("Georgia", FontWeight.BOLD, 20));
         title.setTextFill(PhysoraTheme.INK);
 
         Region spacer = new Region();
@@ -133,20 +152,38 @@ public final class RiverBoatWorkbenchView extends BorderPane {
     private BorderPane buildCenterArea() {
         BorderPane center = new BorderPane();
 
-        // Canvas container
-        VBox canvasContainer = new VBox(canvasRenderer.canvas());
-        canvasContainer.setAlignment(Pos.CENTER);
-        canvasContainer.setStyle("-fx-background-color: #ffffff; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-background-radius: 6px;");
-        canvasContainer.setPadding(new Insets(6));
-        HBox.setHgrow(canvasContainer, Priority.ALWAYS);
-        center.setCenter(canvasContainer);
+        // Genuinely resizable canvas container
+        StackPane canvasHost = new StackPane(canvasRenderer.canvas());
+        canvasHost.setAlignment(Pos.CENTER);
+        canvasHost.setStyle("-fx-background-color: #ffffff; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+        canvasHost.setPadding(new Insets(6));
+        canvasHost.setMinSize(440, 240);
 
-        // Sidebar with Presets, Parameter Controls, Velocity Triangle, and Inspector
-        VBox sidebar = buildSidebar();
-        sidebar.setPadding(new Insets(0, 0, 0, 16));
-        sidebar.setPrefWidth(440);
-        sidebar.setMinWidth(420);
-        center.setRight(sidebar);
+        canvasRenderer.canvas().widthProperty().bind(
+                javafx.beans.binding.Bindings.max(400.0, canvasHost.widthProperty().subtract(14.0)));
+        canvasRenderer.canvas().heightProperty().bind(
+                javafx.beans.binding.Bindings.max(220.0, canvasHost.heightProperty().subtract(14.0)));
+
+        canvasRenderer.canvas().widthProperty().addListener(obs -> renderActiveState());
+        canvasRenderer.canvas().heightProperty().addListener(obs -> renderActiveState());
+
+        center.setCenter(canvasHost);
+
+        // Scrollable Sidebar with Presets, Parameter Controls, Velocity Triangle, and Inspector
+        this.sidebar = buildSidebar();
+        sidebar.setPadding(new Insets(0, 0, 0, 10));
+        sidebar.setPrefWidth(375);
+        sidebar.setMinWidth(345);
+
+        ScrollPane sidebarScroll = new ScrollPane(sidebar);
+        sidebarScroll.setFitToWidth(true);
+        sidebarScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        sidebarScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        sidebarScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent;");
+        sidebarScroll.setPrefWidth(385);
+        sidebarScroll.setMinWidth(355);
+        sidebarScroll.setMaxWidth(405);
+        center.setRight(sidebarScroll);
 
         return center;
     }
@@ -306,7 +343,7 @@ public final class RiverBoatWorkbenchView extends BorderPane {
 
         HBox transportBar = new HBox(10, playPauseBtn, stepBackBtn, stepForwardBtn, resetBtn, timeSlider, timeReadout);
         transportBar.setAlignment(Pos.CENTER_LEFT);
-        transportBar.setPadding(new Insets(12, 0, 0, 0));
+        transportBar.setPadding(new Insets(8, 0, 0, 0));
         return transportBar;
     }
 

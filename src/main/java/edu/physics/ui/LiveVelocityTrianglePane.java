@@ -33,7 +33,7 @@ public final class LiveVelocityTrianglePane extends BorderPane {
     private static final Color COLOR_VB = Color.web("#e56843");   // Flame Orange
     private static final Color COLOR_VBA = Color.web("#059669");  // Emerald Green
 
-    private final Canvas canvas = new Canvas(390, 215);
+    private final Canvas canvas = new Canvas(340, 180);
 
     // Formatted readouts: Vector name, components, magnitude, and constancy badge
     private final Label valVAComponents = new Label();
@@ -48,16 +48,16 @@ public final class LiveVelocityTrianglePane extends BorderPane {
     public LiveVelocityTrianglePane() {
         setId("liveVelocityTrianglePane");
         setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-background-radius: 6px;");
-        setPadding(new Insets(12, 14, 12, 14));
+        setPadding(new Insets(10, 10, 10, 10));
 
         // 1. Header with Formula
         Label title = new Label("DYNAMIC VELOCITY TRIANGLE");
-        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.5));
+        title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.0));
         title.setTextFill(PhysoraTheme.INK);
 
         Label formula = new Label("v_B(t) = v_A(t) + v_{B/A}");
-        formula.setFont(Font.font("Consolas", FontWeight.BOLD, 12.5));
-        formula.setStyle("-fx-background-color: #e2e8f0; -fx-padding: 3 8 3 8; -fx-background-radius: 4px; -fx-text-fill: #0f172a;");
+        formula.setFont(Font.font("Consolas", FontWeight.BOLD, 11.5));
+        formula.setStyle("-fx-background-color: #e2e8f0; -fx-padding: 2 6 2 6; -fx-background-radius: 4px; -fx-text-fill: #0f172a;");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -85,14 +85,14 @@ public final class LiveVelocityTrianglePane extends BorderPane {
         Vector2D vBA = model.relativeVelocityBA(time);
 
         // Update readouts cleanly without long text strings that cause truncation
-        valVAComponents.setText(String.format(Locale.ROOT, "(%+.1f, %+.1f) m/s", vA.x(), vA.y()));
-        valVAMagnitude.setText(String.format(Locale.ROOT, "|v_A| = %.1f m/s", vA.magnitude()));
+        valVAComponents.setText(String.format(Locale.ROOT, "(%.1f, %.1f)", vA.x(), vA.y()));
+        valVAMagnitude.setText(String.format(Locale.ROOT, "%.1f m/s", vA.magnitude()));
 
-        valVBComponents.setText(String.format(Locale.ROOT, "(%+.1f, %+.1f) m/s", vB.x(), vB.y()));
-        valVBMagnitude.setText(String.format(Locale.ROOT, "|v_B| = %.1f m/s", vB.magnitude()));
+        valVBComponents.setText(String.format(Locale.ROOT, "(%.1f, %.1f)", vB.x(), vB.y()));
+        valVBMagnitude.setText(String.format(Locale.ROOT, "%.1f m/s", vB.magnitude()));
 
-        valVBAComponents.setText(String.format(Locale.ROOT, "(%+.1f, %+.1f) m/s", vBA.x(), vBA.y()));
-        valVBAMagnitude.setText(String.format(Locale.ROOT, "|v_{B/A}| = %.1f m/s", vBA.magnitude()));
+        valVBAComponents.setText(String.format(Locale.ROOT, "(%.1f, %.1f)", vBA.x(), vBA.y()));
+        valVBAMagnitude.setText(String.format(Locale.ROOT, "%.1f m/s", vBA.magnitude()));
 
         // Draw Triangle Canvas
         drawTriangle(vA, vB, vBA);
@@ -179,22 +179,23 @@ public final class LiveVelocityTrianglePane extends BorderPane {
 
     private VBox buildReadoutsTable() {
         GridPane grid = new GridPane();
-        grid.setHgap(8);
-        grid.setVgap(4);
-        grid.setPadding(new Insets(4, 0, 4, 0));
+        grid.setHgap(6);
+        grid.setVgap(3);
+        grid.setPadding(new Insets(3, 0, 3, 0));
 
         // Row 0: v_A(t)
         Label lblA = new Label("v_A(t):");
-        lblA.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.5));
+        lblA.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
         lblA.setTextFill(COLOR_VA);
-        lblA.setMinWidth(46);
+        lblA.setMinWidth(42);
 
-        valVAComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
+        valVAComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
         valVAComponents.setTextFill(COLOR_VA);
-        valVAComponents.setMinWidth(115);
+        valVAComponents.setMinWidth(80);
 
-        valVAMagnitude.setFont(Font.font("Consolas", 11));
+        valVAMagnitude.setFont(Font.font("Consolas", 10.0));
         valVAMagnitude.setTextFill(COLOR_VA);
+        valVAMagnitude.setMinWidth(60);
 
         grid.add(lblA, 0, 0);
         grid.add(valVAComponents, 1, 0);
@@ -202,16 +203,17 @@ public final class LiveVelocityTrianglePane extends BorderPane {
 
         // Row 1: v_B(t)
         Label lblB = new Label("v_B(t):");
-        lblB.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.5));
+        lblB.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
         lblB.setTextFill(COLOR_VB);
-        lblB.setMinWidth(46);
+        lblB.setMinWidth(42);
 
-        valVBComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
+        valVBComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
         valVBComponents.setTextFill(COLOR_VB);
-        valVBComponents.setMinWidth(115);
+        valVBComponents.setMinWidth(80);
 
-        valVBMagnitude.setFont(Font.font("Consolas", 11));
+        valVBMagnitude.setFont(Font.font("Consolas", 10.0));
         valVBMagnitude.setTextFill(COLOR_VB);
+        valVBMagnitude.setMinWidth(60);
 
         grid.add(lblB, 0, 1);
         grid.add(valVBComponents, 1, 1);
@@ -219,21 +221,21 @@ public final class LiveVelocityTrianglePane extends BorderPane {
 
         // Row 2: v_{B/A}
         Label lblBA = new Label("v_{B/A}:");
-        lblBA.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.5));
+        lblBA.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
         lblBA.setTextFill(COLOR_VBA);
-        lblBA.setMinWidth(46);
+        lblBA.setMinWidth(42);
 
-        valVBAComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
+        valVBAComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
         valVBAComponents.setTextFill(COLOR_VBA);
-        valVBAComponents.setMinWidth(115);
+        valVBAComponents.setMinWidth(80);
 
-        Label constBadge = new Label("CONSTANT (a_rel = 0)");
-        constBadge.setFont(Font.font("Consolas", FontWeight.BOLD, 9.5));
-        constBadge.setStyle("-fx-background-color: #d1fae5; -fx-text-fill: #065f46; -fx-padding: 1 5 1 5; -fx-background-radius: 3px;");
+        Label constBadge = new Label("CONST (a_rel=0)");
+        constBadge.setFont(Font.font("Consolas", FontWeight.BOLD, 9.0));
+        constBadge.setStyle("-fx-background-color: #d1fae5; -fx-text-fill: #065f46; -fx-padding: 1 4 1 4; -fx-background-radius: 3px;");
 
-        HBox vbaMagBox = new HBox(6, valVBAMagnitude, constBadge);
+        HBox vbaMagBox = new HBox(4, valVBAMagnitude, constBadge);
         vbaMagBox.setAlignment(Pos.CENTER_LEFT);
-        valVBAMagnitude.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
+        valVBAMagnitude.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
         valVBAMagnitude.setTextFill(COLOR_VBA);
 
         grid.add(lblBA, 0, 2);
@@ -242,10 +244,11 @@ public final class LiveVelocityTrianglePane extends BorderPane {
 
         // Explanatory Note below grid
         Label note = new Label("dv_A/dt = dv_B/dt = -g j  \u27F9  d(v_{B/A})/dt = 0 (Relative velocity invariant)");
-        note.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; -fx-text-fill: #334155; " +
-                "-fx-background-color: #f1f5f9; -fx-padding: 4 8 4 8; -fx-border-color: #cbd5e1; -fx-border-radius: 4px;");
+        note.setWrapText(true);
+        note.setStyle("-fx-font-family: Consolas; -fx-font-size: 9.0px; -fx-text-fill: #334155; " +
+                "-fx-background-color: #f1f5f9; -fx-padding: 4 6 4 6; -fx-border-color: #cbd5e1; -fx-border-radius: 4px;");
 
-        VBox container = new VBox(6, grid, note);
+        VBox container = new VBox(4, grid, note);
         return container;
     }
 }

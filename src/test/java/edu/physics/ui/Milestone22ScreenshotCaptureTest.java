@@ -221,10 +221,7 @@ class Milestone22ScreenshotCaptureTest {
             stageRef.get().setScene(shellScene);
 
             // Navigate to Chapter 2
-            Node ch2Nav = shellScene.lookup("#nav_chapter_2");
-            if (ch2Nav instanceof Button btn) {
-                btn.fire();
-            }
+            shell.selectChapter(2);
             sceneRef.set(shellScene);
             return null;
         });

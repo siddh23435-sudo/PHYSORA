@@ -202,4 +202,51 @@ class RiverBoatWorkbenchTest {
             return null;
         });
     }
+
+    @Test
+    @DisplayName("PhysoraApplicationShell navigation switches between Kinematics and Chapter 2 experiments")
+    void testShellNavigationBetweenKinematicsAndChapter2Experiments() throws Exception {
+        FxTestRuntime.runOnFxThread(() -> {
+            PhysoraApplicationShell shell = new PhysoraApplicationShell();
+
+            // Starts on Chapter 1 (Kinematics)
+            assertEquals(1, shell.chapterRail().selectedChapter().number());
+            assertSame(shell.normalBenchView(), shell.getCenter());
+
+            // Select Chapter 2 via shell
+            shell.selectChapter(2);
+            assertEquals(2, shell.chapterRail().selectedChapter().number());
+            assertSame(shell.plannedChapterView(), shell.getCenter());
+
+            // By default, Experiment 2.1 (Two-Projectile) is active
+            PlannedChapterView plannedView = shell.plannedChapterView();
+            Button btnExpRiverBoat = (Button) plannedView.lookup("#btnExpRiverBoat");
+            Button btnExpTwoProj = (Button) plannedView.lookup("#btnExpTwoProjectile");
+            assertNotNull(btnExpRiverBoat);
+            assertNotNull(btnExpTwoProj);
+
+            // Click Experiment 2.2 button -> Switches to River-Boat workbench, NOT Kinematics
+            btnExpRiverBoat.fire();
+            assertSame(shell.plannedChapterView(), shell.getCenter());
+            assertNotSame(shell.normalBenchView(), shell.getCenter());
+            assertNotNull(shell.lookup("#riverBoatWorkbenchView"));
+
+            // Click Experiment 2.1 button -> Switches to Two-Projectile workbench
+            btnExpTwoProj.fire();
+            assertSame(shell.plannedChapterView(), shell.getCenter());
+            assertNotNull(shell.lookup("#relativeMotionWorkbenchView"));
+
+            // Switch to Experiment 2.2 and click returnToKinematicsButton -> Returns to Kinematics
+            btnExpRiverBoat.fire();
+            Button returnBtn = (Button) shell.lookup("#returnToKinematicsButton");
+            assertNotNull(returnBtn);
+            returnBtn.fire();
+
+            assertEquals(1, shell.chapterRail().selectedChapter().number());
+            assertSame(shell.normalBenchView(), shell.getCenter());
+
+            shell.dispose();
+            return null;
+        });
+    }
 }

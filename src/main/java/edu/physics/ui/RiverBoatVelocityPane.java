@@ -35,7 +35,16 @@ public final class RiverBoatVelocityPane extends BorderPane {
     private static final Color COLOR_U = Color.web("#e56843");        // Flame Orange
     private static final Color COLOR_V_GROUND = Color.web("#2453d4"); // Cobalt Blue
 
-    private final Canvas canvas = new Canvas(390, 215);
+    private final Canvas canvas = new Canvas(340, 175);
+
+    public Canvas canvas() {
+        return canvas;
+    }
+
+    public void setDimensions(double width, double height) {
+        canvas.setWidth(width);
+        canvas.setHeight(height);
+    }
 
     // Formatted readouts: Vector name, components, magnitude, and status badge
     private final Label valVRelComponents = new Label();
@@ -95,19 +104,17 @@ public final class RiverBoatVelocityPane extends BorderPane {
         RiverBoatResult result = model.analyticalResult();
 
         // 1. Update text readouts
-        valVRelComponents.setText(String.format(Locale.US, "(%.2f, %.2f) m/s", vRel.x(), vRel.y()));
-        valVRelMagnitude.setText(String.format(Locale.US, "%.2f m/s", model.boatSpeed()));
-        valVRelBadge.setText(String.format(Locale.US, "θ = %.1f° upstream", model.headingAngleDeg()));
+        valVRelComponents.setText(String.format(Locale.US, "(%.1f, %.1f)", vRel.x(), vRel.y()));
+        valVRelMagnitude.setText(String.format(Locale.US, "%.1f m/s", model.boatSpeed()));
+        valVRelBadge.setText(String.format(Locale.US, "θ=%.1f°", model.headingAngleDeg()));
 
-        valUComponents.setText(String.format(Locale.US, "(%.2f, 0.00) m/s", u.x()));
-        valUMagnitude.setText(String.format(Locale.US, "%.2f m/s", model.riverSpeed()));
-        valUBadge.setText("downstream (+x)");
+        valUComponents.setText(String.format(Locale.US, "(%.1f, 0.0)", u.x()));
+        valUMagnitude.setText(String.format(Locale.US, "%.1f m/s", model.riverSpeed()));
+        valUBadge.setText("current");
 
-        valVGroundComponents.setText(String.format(Locale.US, "(%.2f, %.2f) m/s", vGround.x(), vGround.y()));
-        valVGroundMagnitude.setText(String.format(Locale.US, "%.2f m/s", vGround.magnitude()));
-
-        double groundAngleDeg = Math.toDegrees(Math.atan2(vGround.y(), vGround.x()));
-        valVGroundBadge.setText(String.format(Locale.US, "ground path (%.1f°)", groundAngleDeg));
+        valVGroundComponents.setText(String.format(Locale.US, "(%.1f, %.1f)", vGround.x(), vGround.y()));
+        valVGroundMagnitude.setText(String.format(Locale.US, "%.1f m/s", vGround.magnitude()));
+        valVGroundBadge.setText("ground");
 
         // 2. Update educational insight card
         updateInsightCard(result, model);
@@ -231,32 +238,32 @@ public final class RiverBoatVelocityPane extends BorderPane {
 
     private VBox buildBottomArea() {
         GridPane table = new GridPane();
-        table.setHgap(8);
-        table.setVgap(4);
-        table.setPadding(new Insets(6, 4, 8, 4));
+        table.setHgap(6);
+        table.setVgap(3);
+        table.setPadding(new Insets(4, 2, 4, 2));
 
         table.add(createHeaderLabel("VECTOR"), 0, 0);
-        table.add(createHeaderLabel("COMPONENTS (vx, vy)"), 1, 0);
-        table.add(createHeaderLabel("SPEED & ORIENTATION"), 2, 0);
+        table.add(createHeaderLabel("(vx, vy)"), 1, 0);
+        table.add(createHeaderLabel("SPEED & ROLE"), 2, 0);
 
         // Row 1: v_{b/r}
-        table.add(createVectorBadge("v_b/r (water)", COLOR_V_REL), 0, 1);
+        table.add(createVectorBadge("v_b/r", COLOR_V_REL), 0, 1);
         table.add(valVRelComponents, 1, 1);
-        HBox row1Box = new HBox(6, valVRelMagnitude, valVRelBadge);
+        HBox row1Box = new HBox(4, valVRelMagnitude, valVRelBadge);
         row1Box.setAlignment(Pos.CENTER_LEFT);
         table.add(row1Box, 2, 1);
 
         // Row 2: u
-        table.add(createVectorBadge("u (current)", COLOR_U), 0, 2);
+        table.add(createVectorBadge("u", COLOR_U), 0, 2);
         table.add(valUComponents, 1, 2);
-        HBox row2Box = new HBox(6, valUMagnitude, valUBadge);
+        HBox row2Box = new HBox(4, valUMagnitude, valUBadge);
         row2Box.setAlignment(Pos.CENTER_LEFT);
         table.add(row2Box, 2, 2);
 
         // Row 3: v_{b/g}
-        table.add(createVectorBadge("v_b/g (ground)", COLOR_V_GROUND), 0, 3);
+        table.add(createVectorBadge("v_b/g", COLOR_V_GROUND), 0, 3);
         table.add(valVGroundComponents, 1, 3);
-        HBox row3Box = new HBox(6, valVGroundMagnitude, valVGroundBadge);
+        HBox row3Box = new HBox(4, valVGroundMagnitude, valVGroundBadge);
         row3Box.setAlignment(Pos.CENTER_LEFT);
         table.add(row3Box, 2, 3);
 

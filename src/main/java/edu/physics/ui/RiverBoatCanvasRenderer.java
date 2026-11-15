@@ -38,7 +38,7 @@ public final class RiverBoatCanvasRenderer {
     private static final Color COLOR_V_GROUND = Color.web("#2453d4"); // Cobalt Blue (Resultant Ground)
     private static final Color COLOR_TRAIL = Color.web("#2563eb", 0.65);
 
-    private final Canvas canvas = new Canvas(840, 520);
+    private final Canvas canvas = new Canvas(720, 420);
 
     public Canvas canvas() {
         return canvas;

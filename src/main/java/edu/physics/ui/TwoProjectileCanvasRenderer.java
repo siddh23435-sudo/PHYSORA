@@ -27,10 +27,15 @@ public final class TwoProjectileCanvasRenderer {
     private static final Color COLOR_LINE_OF_SIGHT = Color.web("#64748b"); // Slate Gray
     private static final Color COLOR_R_REL = Color.web("#0284c7");        // Sky Blue for r_rel
 
-    private final Canvas canvas = new Canvas(850, 540);
+    private final Canvas canvas = new Canvas(720, 440);
 
     public Canvas canvas() {
         return canvas;
+    }
+
+    public void setDimensions(double width, double height) {
+        canvas.setWidth(width);
+        canvas.setHeight(height);
     }
 
     public void render(TwoProjectilePursuitModel model, double time, ReferenceFrame frame) {
@@ -164,9 +169,6 @@ public final class TwoProjectileCanvasRenderer {
         gc.setLineWidth(3.0);
         gc.strokeLine(startX, startY, endX, endY);
 
-        // Timestamp Tick Marks along the straight-line path to demonstrate uniform speed
-        drawTrajectoryTickMarks(gc, model, box, observerIsA, duration);
-
         // C. Current Moving Body & Separation
         Vector2D rRelCurrent = observerIsA ? model.relativePositionBA(time) : model.relativePositionAB(time);
         Vector2D vRelCurrent = observerIsA ? model.relativeVelocityBA(time) : model.relativeVelocityAB(time);
@@ -174,6 +176,10 @@ public final class TwoProjectileCanvasRenderer {
         double currentX = box.toScreenX(rRelCurrent.x());
         double currentY = box.toScreenY(rRelCurrent.y());
         double dist = rRelCurrent.magnitude();
+
+        // Timestamp Tick Marks along the straight-line path to demonstrate uniform speed
+        // (Suppressed near origin and moving body to guarantee zero label collisions)
+        drawTrajectoryTickMarks(gc, model, box, observerIsA, duration, originScreenX, originScreenY, currentX, currentY);
 
         Color movingColor = observerIsA ? COLOR_BODY_B : COLOR_BODY_A;
         String movingLabel = observerIsA ? "B" : "A";
@@ -184,13 +190,13 @@ public final class TwoProjectileCanvasRenderer {
 
         // E. Relative velocity arrow (strictly CONSTANT vector!)
         String vLabel = observerIsA ? "v_{B/A} (const)" : "v_{A/B} (const)";
-        drawRelativeVelocityVector(gc, currentX, currentY, vRelCurrent, box, COLOR_RELATIVE, vLabel);
+        drawRelativeVelocityVector(gc, currentX, currentY, vRelCurrent, box, COLOR_RELATIVE, vLabel, dist);
 
         // F. Draw moving body disk (omit text when close to origin to avoid overlap)
         boolean nearOrigin = dist < 7.0;
         drawBodyDisk(gc, currentX, currentY, movingColor, nearOrigin ? "" : movingLabel);
 
-        // G. Prominent Observer Anchor Pin at Origin (0, 0) - positioned on LEFT side away from incoming path
+        // G. Prominent Observer Anchor Pin at Origin (0, 0) - positioned on safe side with backdrop pill
         Color observerColor = observerIsA ? COLOR_BODY_A : COLOR_BODY_B;
         String observerName = observerIsA ? "OBSERVER A (ORIGIN)" : "OBSERVER B (ORIGIN)";
         drawObserverOriginPin(gc, originScreenX, originScreenY, observerColor, observerName, rRelStart.x() > 0);
@@ -219,7 +225,8 @@ public final class TwoProjectileCanvasRenderer {
             // Right-angle marker circle at closest approach point
             gc.setFill(Color.web("#e11d48"));
             gc.fillOval(closeX - 3.5, closeY - 3.5, 7, 7);
-            gc.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
+            gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
+            gc.setFill(Color.web("#e11d48"));
             gc.fillText(String.format(Locale.ROOT, "d_min = %.2f m (t* = %.2fs)", dMin, tMin),
                     closeX + 8, closeY - 8);
         }
@@ -229,7 +236,11 @@ public final class TwoProjectileCanvasRenderer {
                                          TwoProjectilePursuitModel model,
                                          ViewportBox box,
                                          boolean observerIsA,
-                                         double duration) {
+                                         double duration,
+                                         double originX,
+                                         double originY,
+                                         double currentX,
+                                         double currentY) {
         int intervals = Math.min(8, Math.max(4, (int) Math.round(duration * 1.5)));
         gc.setFill(Color.web("#065f46"));
         gc.setFont(Font.font("Consolas", FontWeight.BOLD, 9.5));
@@ -243,9 +254,13 @@ public final class TwoProjectileCanvasRenderer {
             // Tick dot
             gc.fillOval(sx - 2.5, sy - 2.5, 5, 5);
 
-            // Time label only on alternate ticks to prevent crowding
+            // Time label only on alternate ticks to prevent crowding, and NEVER near origin or current body
             if (i > 0 && i < intervals && (i % 2 == 0)) {
-                gc.fillText(String.format(Locale.ROOT, "t=%.1fs", t), sx - 14, sy + 14);
+                double distOrigin = Math.hypot(sx - originX, sy - originY);
+                double distCurrent = Math.hypot(sx - currentX, sy - currentY);
+                if (distOrigin > 55.0 && distCurrent > 45.0) {
+                    gc.fillText(String.format(Locale.ROOT, "t=%.1fs", t), sx - 14, sy + 14);
+                }
             }
         }
     }
@@ -272,17 +287,26 @@ public final class TwoProjectileCanvasRenderer {
         gc.setFill(color);
         gc.fillOval(sx - 3, sy - 3, 6, 6);
 
-        // Origin text placed away from incoming trajectory side to prevent any overlap
-        double labelX = incomingFromRight ? (sx - 180) : (sx + r + 8);
-        double labelY = sy + 18;
+        // Origin badge card: placed neatly to the side and slightly above the horizontal line
+        double cardW = 162.0;
+        double cardH = 32.0;
+        double cardX = incomingFromRight ? (sx - cardW - 14) : (sx + r + 8);
+        double cardY = sy - cardH - 6;
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
+        // Translucent pill backdrop to guarantee high contrast against grid lines
+        gc.setFill(Color.web("#ffffff", 0.90));
+        gc.setStroke(Color.web("#cbd5e1"));
+        gc.setLineWidth(1.0);
+        gc.fillRoundRect(cardX, cardY, cardW, cardH, 4, 4);
+        gc.strokeRoundRect(cardX, cardY, cardW, cardH, 4, 4);
+
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
         gc.setFill(PhysoraTheme.INK);
-        gc.fillText("⦿ " + name + " (0, 0)", labelX, labelY);
+        gc.fillText("⦿ " + name, cardX + 6, cardY + 14);
 
-        gc.setFont(Font.font("Consolas", 9.5));
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 9.0));
         gc.setFill(Color.web("#64748b"));
-        gc.fillText("[a_origin = g \u2193]", labelX, labelY + 13);
+        gc.fillText("[a_origin = g \u2193]", cardX + 6, cardY + 26);
     }
 
     private void drawDisplacementVector(GraphicsContext gc,
@@ -310,13 +334,19 @@ public final class TwoProjectileCanvasRenderer {
                 3
         );
 
-        // Only draw distance text when separation > 14 m to prevent crowding near origin
-        if (dist >= 14.0) {
+        // Only draw distance text when separation > 20 m to prevent crowding near origin and body
+        if (dist >= 20.0) {
             double midX = (ox + ex) / 2.0;
-            double midY = (oy + ey) / 2.0 - 8;
-            gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
+            double midY = (oy + ey) / 2.0 + 16;
+            double badgeW = 60.0;
+            double badgeH = 15.0;
+
+            gc.setFill(Color.web("#ffffff", 0.85));
+            gc.fillRoundRect(midX - badgeW / 2.0, midY - 11, badgeW, badgeH, 3, 3);
+
+            gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
             gc.setFill(COLOR_R_REL);
-            gc.fillText(String.format(Locale.ROOT, "d = %.1f m", dist), midX - 25, midY);
+            gc.fillText(String.format(Locale.ROOT, "d = %.1f m", dist), midX - 25, midY + 1);
         }
     }
 
@@ -325,7 +355,8 @@ public final class TwoProjectileCanvasRenderer {
                                             Vector2D vel,
                                             ViewportBox box,
                                             Color color,
-                                            String label) {
+                                            String label,
+                                            double distToOrigin) {
         double velScale = 1.2;
         double ex = sx + vel.x() * box.scale * (velScale / 10.0);
         double ey = sy - vel.y() * box.scale * (velScale / 10.0);
@@ -343,10 +374,19 @@ public final class TwoProjectileCanvasRenderer {
                 3
         );
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        // Offset perpendicular to arrow to avoid line overlap
-        double perpAngle = angle - Math.PI / 2.0;
-        gc.fillText(label, ex + 8 * Math.cos(perpAngle), ey + 8 * Math.sin(perpAngle));
+        // Omit text label during near-origin/collision states to prevent overlapping origin/collision badges
+        if (distToOrigin >= 8.0) {
+            gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
+            double perpAngle = angle - Math.PI / 2.0;
+            double lx = ex + 10 * Math.cos(perpAngle);
+            double ly = ey + 10 * Math.sin(perpAngle);
+
+            gc.setFill(Color.web("#ffffff", 0.85));
+            gc.fillRoundRect(lx - 2, ly - 10, 84, 14, 3, 3);
+
+            gc.setFill(color);
+            gc.fillText(label, lx, ly);
+        }
     }
 
     private void drawParabolicTrail(GraphicsContext gc,
@@ -437,11 +477,22 @@ public final class TwoProjectileCanvasRenderer {
         gc.setFill(Color.web("#92400e"));
         gc.fillOval(sx - 4, sy - 4, 8, 8);
 
-        // Compact pill banner centered above marker
+        // Prominent pill banner centered above marker with amber backdrop (positioned above origin badge)
         String text = String.format(Locale.ROOT, "★ %s (t* = %.2fs)", title, tCol);
-        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
+        double bannerW = 184.0;
+        double bannerH = 22.0;
+        double bannerX = sx - bannerW / 2.0;
+        double bannerY = sy - 58.0;
+
+        gc.setFill(Color.web("#fef3c7", 0.95));
+        gc.setStroke(Color.web("#f59e0b"));
+        gc.setLineWidth(1.2);
+        gc.fillRoundRect(bannerX, bannerY, bannerW, bannerH, 4, 4);
+        gc.strokeRoundRect(bannerX, bannerY, bannerW, bannerH, 4, 4);
+
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
         gc.setFill(Color.web("#78350f"));
-        gc.fillText(text, sx - 68, sy - 22);
+        gc.fillText(text, bannerX + 8, bannerY + 15);
     }
 
     private void drawNearMissMarker(GraphicsContext gc,

@@ -54,7 +54,7 @@ final class PlannedChapterView extends BorderPane {
         setId("plannedChapterView");
         getStyleClass().add("planned-chapter-view");
         setStyle("-fx-background-color: #f5f1e5;");
-        setPadding(new Insets(16, 24, 16, 24));
+        setPadding(new Insets(10, 16, 10, 16));
 
         this.relativeMotionWorkbench = new RelativeMotionWorkbenchView(new RelativeMotionSimulationController());
         this.relativeMotionWorkbench.setOnReturnToKinematics(() -> {

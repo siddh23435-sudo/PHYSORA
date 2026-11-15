@@ -8,12 +8,14 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -56,13 +58,14 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
 
     private final Button returnButton = new Button("⚗ RETURN TO KINEMATICS");
     private Runnable onReturnToKinematics;
+    private VBox sidebar;
 
     public RelativeMotionWorkbenchView(RelativeMotionSimulationController controller) {
         this.controller = controller;
 
         setId("relativeMotionWorkbenchView");
         setStyle("-fx-background-color: #f5f1e5;");
-        setPadding(new Insets(16, 24, 16, 24));
+        setPadding(new Insets(10, 16, 10, 16));
 
         setTop(buildTopBar());
         setCenter(buildCenterArea());
@@ -81,6 +84,22 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
         return returnButton;
     }
 
+    public LiveVelocityTrianglePane velocityTrianglePane() {
+        return velocityTrianglePane;
+    }
+
+    @Override
+    public javafx.scene.Node lookup(String selector) {
+        javafx.scene.Node found = super.lookup(selector);
+        if (found != null) {
+            return found;
+        }
+        if (sidebar != null) {
+            return sidebar.lookup(selector);
+        }
+        return null;
+    }
+
     public void setOnReturnToKinematics(Runnable callback) {
         this.onReturnToKinematics = callback;
     }
@@ -95,7 +114,7 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
         eyebrow.setTextFill(PhysoraTheme.MUTED);
 
         Label title = new Label("TWO-PROJECTILE PURSUIT ACROSS REFERENCE FRAMES");
-        title.setFont(Font.font("Georgia", FontWeight.BOLD, 22));
+        title.setFont(Font.font("Georgia", FontWeight.BOLD, 20));
         title.setTextFill(PhysoraTheme.INK);
 
         // Frame switcher buttons
@@ -129,29 +148,47 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
 
         HBox controlRow = new HBox(12, frameButtons, spacer, returnButton);
         controlRow.setAlignment(Pos.CENTER_LEFT);
-        controlRow.setPadding(new Insets(10, 0, 10, 0));
+        controlRow.setPadding(new Insets(6, 0, 6, 0));
 
-        VBox topBar = new VBox(4, eyebrow, title, controlRow);
+        VBox topBar = new VBox(2, eyebrow, title, controlRow);
         return topBar;
     }
 
     private BorderPane buildCenterArea() {
         BorderPane center = new BorderPane();
 
-        // Canvas container
-        VBox canvasContainer = new VBox(canvasRenderer.canvas());
-        canvasContainer.setAlignment(Pos.CENTER);
-        canvasContainer.setStyle("-fx-background-color: #ffffff; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-background-radius: 6px;");
-        canvasContainer.setPadding(new Insets(6));
-        HBox.setHgrow(canvasContainer, Priority.ALWAYS);
-        center.setCenter(canvasContainer);
+        // Genuinely resizable canvas container
+        StackPane canvasHost = new StackPane(canvasRenderer.canvas());
+        canvasHost.setAlignment(Pos.CENTER);
+        canvasHost.setStyle("-fx-background-color: #ffffff; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+        canvasHost.setPadding(new Insets(6));
+        canvasHost.setMinSize(440, 240);
 
-        // Sidebar with Presets, Dynamic Vector Triangle, and Structured Inspector
-        VBox sidebar = buildSidebar();
-        sidebar.setPadding(new Insets(0, 0, 0, 16));
-        sidebar.setPrefWidth(440);
-        sidebar.setMinWidth(420);
-        center.setRight(sidebar);
+        canvasRenderer.canvas().widthProperty().bind(
+                javafx.beans.binding.Bindings.max(400.0, canvasHost.widthProperty().subtract(14.0)));
+        canvasRenderer.canvas().heightProperty().bind(
+                javafx.beans.binding.Bindings.max(220.0, canvasHost.heightProperty().subtract(14.0)));
+
+        canvasRenderer.canvas().widthProperty().addListener(obs -> renderActiveState());
+        canvasRenderer.canvas().heightProperty().addListener(obs -> renderActiveState());
+
+        center.setCenter(canvasHost);
+
+        // Scrollable Sidebar with Presets, Dynamic Vector Triangle, and Structured Inspector
+        this.sidebar = buildSidebar();
+        sidebar.setPadding(new Insets(0, 0, 0, 10));
+        sidebar.setPrefWidth(375);
+        sidebar.setMinWidth(345);
+
+        ScrollPane sidebarScroll = new ScrollPane(sidebar);
+        sidebarScroll.setFitToWidth(true);
+        sidebarScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        sidebarScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        sidebarScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent;");
+        sidebarScroll.setPrefWidth(385);
+        sidebarScroll.setMinWidth(355);
+        sidebarScroll.setMaxWidth(405);
+        center.setRight(sidebarScroll);
 
         return center;
     }
@@ -279,7 +316,7 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
                 timeReadout
         );
         transport.setAlignment(Pos.CENTER_LEFT);
-        transport.setPadding(new Insets(12, 0, 0, 0));
+        transport.setPadding(new Insets(8, 0, 0, 0));
         return transport;
     }
 
