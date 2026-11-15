@@ -44,9 +44,11 @@ final class PlannedChapterView extends BorderPane {
     // Chapter 02 Workbenches
     private final RelativeMotionWorkbenchView relativeMotionWorkbench;
     private final RiverBoatWorkbenchView riverBoatWorkbench;
+    private final RainManWorkbenchView rainManWorkbench;
     private final BorderPane chapter2Container = new BorderPane();
     private final Button btnExpTwoProjectile = new Button("EXPERIMENT 2.1: TWO-PROJECTILE REFERENCE FRAMES");
     private final Button btnExpRiverBoat = new Button("EXPERIMENT 2.2: RIVER-BOAT VECTOR CROSSING");
+    private final Button btnExpRainMan = new Button("EXPERIMENT 2.3: RAIN-MAN & UMBRELLA ORIENTATION");
 
     private Runnable onReturnToKinematics;
 
@@ -70,12 +72,20 @@ final class PlannedChapterView extends BorderPane {
             }
         });
 
+        this.rainManWorkbench = new RainManWorkbenchView(new RainManSimulationController());
+        this.rainManWorkbench.setOnReturnToKinematics(() -> {
+            if (onReturnToKinematics != null) {
+                onReturnToKinematics.run();
+            }
+        });
+
         returnButton.setId("returnToKinematicsButton");
         returnButton.getStyleClass().add("transport-primary");
         returnButton.setStyle("-fx-font-size: 11px; -fx-padding: 10 18 10 18;");
         returnButton.setOnAction(e -> {
             relativeMotionWorkbench.controller().pause();
             riverBoatWorkbench.controller().pause();
+            rainManWorkbench.controller().pause();
             if (onReturnToKinematics != null) {
                 onReturnToKinematics.run();
             }
@@ -89,11 +99,13 @@ final class PlannedChapterView extends BorderPane {
     private void setupChapter2Container() {
         btnExpTwoProjectile.setId("btnExpTwoProjectile");
         btnExpRiverBoat.setId("btnExpRiverBoat");
+        btnExpRainMan.setId("btnExpRainMan");
 
         btnExpTwoProjectile.setOnAction(e -> selectChapter2Experiment(1));
         btnExpRiverBoat.setOnAction(e -> selectChapter2Experiment(2));
+        btnExpRainMan.setOnAction(e -> selectChapter2Experiment(3));
 
-        HBox subNav = new HBox(8, btnExpTwoProjectile, btnExpRiverBoat);
+        HBox subNav = new HBox(8, btnExpTwoProjectile, btnExpRiverBoat, btnExpRainMan);
         subNav.setAlignment(Pos.CENTER_LEFT);
         subNav.setPadding(new Insets(0, 0, 10, 0));
 
@@ -102,16 +114,27 @@ final class PlannedChapterView extends BorderPane {
     }
 
     void selectChapter2Experiment(int experimentIndex) {
-        if (experimentIndex == 2) {
+        if (experimentIndex == 3) {
             relativeMotionWorkbench.controller().pause();
+            riverBoatWorkbench.controller().pause();
+            chapter2Container.setCenter(rainManWorkbench);
+            styleActiveButton(btnExpRainMan, true);
+            styleActiveButton(btnExpTwoProjectile, false);
+            styleActiveButton(btnExpRiverBoat, false);
+        } else if (experimentIndex == 2) {
+            relativeMotionWorkbench.controller().pause();
+            rainManWorkbench.controller().pause();
             chapter2Container.setCenter(riverBoatWorkbench);
             styleActiveButton(btnExpRiverBoat, true);
             styleActiveButton(btnExpTwoProjectile, false);
+            styleActiveButton(btnExpRainMan, false);
         } else {
             riverBoatWorkbench.controller().pause();
+            rainManWorkbench.controller().pause();
             chapter2Container.setCenter(relativeMotionWorkbench);
             styleActiveButton(btnExpTwoProjectile, true);
             styleActiveButton(btnExpRiverBoat, false);
+            styleActiveButton(btnExpRainMan, false);
         }
     }
 
@@ -133,6 +156,10 @@ final class PlannedChapterView extends BorderPane {
         return riverBoatWorkbench;
     }
 
+    RainManWorkbenchView rainManWorkbench() {
+        return rainManWorkbench;
+    }
+
     Button returnButton() {
         return returnButton;
     }
@@ -143,6 +170,10 @@ final class PlannedChapterView extends BorderPane {
 
     Button btnExpRiverBoat() {
         return btnExpRiverBoat;
+    }
+
+    Button btnExpRainMan() {
+        return btnExpRainMan;
     }
 
     private VBox buildContent() {
@@ -201,6 +232,7 @@ final class PlannedChapterView extends BorderPane {
         // Pause active simulations when navigating away from Chapter 02
         relativeMotionWorkbench.controller().pause();
         riverBoatWorkbench.controller().pause();
+        rainManWorkbench.controller().pause();
 
         setCenter(standardContent);
         chapterHeader.setText(String.format("CHAPTER %s   /   JEE MECHANICS", chapter.formattedNumber()));
@@ -225,6 +257,7 @@ final class PlannedChapterView extends BorderPane {
     void dispose() {
         relativeMotionWorkbench.dispose();
         riverBoatWorkbench.dispose();
+        rainManWorkbench.dispose();
     }
 
     private static Node rule() {
