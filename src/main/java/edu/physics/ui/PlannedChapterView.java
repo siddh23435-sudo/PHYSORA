@@ -40,13 +40,15 @@ final class PlannedChapterView extends BorderPane {
     private final Label chapterDesc = new Label();
     private final FlowPane topicsPane = new FlowPane(10, 10);
     private final Button returnButton = new Button("⚗  RETURN TO KINEMATICS EXPERIMENT");
+    private final VBox standardContent;
+    private final RelativeMotionWorkbenchView relativeMotionWorkbench;
     private Runnable onReturnToKinematics;
 
     PlannedChapterView() {
         setId("plannedChapterView");
         getStyleClass().add("planned-chapter-view");
         setStyle("-fx-background-color: #f5f1e5;");
-        setPadding(new Insets(24, 32, 24, 32));
+        setPadding(new Insets(16, 24, 16, 24));
 
         returnButton.setId("returnToKinematicsButton");
         returnButton.getStyleClass().add("transport-primary");
@@ -57,8 +59,19 @@ final class PlannedChapterView extends BorderPane {
             }
         });
 
-        VBox content = buildContent();
-        setCenter(content);
+        this.standardContent = buildContent();
+        this.relativeMotionWorkbench = new RelativeMotionWorkbenchView(new RelativeMotionSimulationController());
+        this.relativeMotionWorkbench.setOnReturnToKinematics(() -> {
+            if (onReturnToKinematics != null) {
+                onReturnToKinematics.run();
+            }
+        });
+
+        setCenter(standardContent);
+    }
+
+    RelativeMotionWorkbenchView relativeMotionWorkbench() {
+        return relativeMotionWorkbench;
     }
 
     Button returnButton() {
@@ -113,6 +126,12 @@ final class PlannedChapterView extends BorderPane {
     }
 
     void setChapter(ChapterCapability chapter) {
+        if (chapter.number() == 2) {
+            setCenter(relativeMotionWorkbench);
+            return;
+        }
+
+        setCenter(standardContent);
         chapterHeader.setText(String.format("CHAPTER %s   /   JEE MECHANICS", chapter.formattedNumber()));
         chapterTitle.setText(chapter.title().toUpperCase());
         chapterDesc.setText(chapter.description());

@@ -32,6 +32,7 @@ final class PhysoraApplicationShell extends BorderPane {
     void dispose() {
         normalBenchView.dispose();
         controller.dispose();
+        plannedChapterView.relativeMotionWorkbench().dispose();
     }
 
     ChapterRail chapterRail() { return chapterRail; }
