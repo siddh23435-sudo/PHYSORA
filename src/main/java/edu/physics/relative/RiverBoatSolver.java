@@ -76,6 +76,12 @@ public final class RiverBoatSolver {
             type = RiverBoatCrossingType.SHORTEST_TIME;
         } else if (policy.isZeroPosition(drift, riverWidth)) {
             type = RiverBoatCrossingType.ZERO_DRIFT_ACHIEVABLE;
+        } else if (boatSpeed < riverSpeed) {
+            double optimalSinTheta = boatSpeed / riverSpeed;
+            double optimalTheta = Math.asin(optimalSinTheta);
+            if (policy.areEqual(headingAngleRad, optimalTheta, 1e-9)) {
+                type = RiverBoatCrossingType.ZERO_DRIFT_UNACHIEVABLE;
+            }
         }
 
         return new RiverBoatResult(

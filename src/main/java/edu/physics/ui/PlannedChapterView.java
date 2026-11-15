@@ -6,14 +6,12 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
@@ -21,8 +19,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Informative view displayed when a student navigates to a planned curriculum chapter.
+ * Informative view displayed when a student navigates to a curriculum chapter.
  * Prevents launching empty or misleading simulations while preserving the active Kinematics model in memory.
+ * For Chapter 02 (Relative Motion), hosts both the Two-Projectile and River-Boat workbenches.
  */
 final class PlannedChapterView extends BorderPane {
     private static final Map<Integer, List<String>> TOPIC_ROADMAPS = Map.of(
@@ -41,7 +40,14 @@ final class PlannedChapterView extends BorderPane {
     private final FlowPane topicsPane = new FlowPane(10, 10);
     private final Button returnButton = new Button("⚗  RETURN TO KINEMATICS EXPERIMENT");
     private final VBox standardContent;
+
+    // Chapter 02 Workbenches
     private final RelativeMotionWorkbenchView relativeMotionWorkbench;
+    private final RiverBoatWorkbenchView riverBoatWorkbench;
+    private final BorderPane chapter2Container = new BorderPane();
+    private final Button btnExpTwoProjectile = new Button("EXPERIMENT 2.1: TWO-PROJECTILE REFERENCE FRAMES");
+    private final Button btnExpRiverBoat = new Button("EXPERIMENT 2.2: RIVER-BOAT VECTOR CROSSING");
+
     private Runnable onReturnToKinematics;
 
     PlannedChapterView() {
@@ -50,16 +56,6 @@ final class PlannedChapterView extends BorderPane {
         setStyle("-fx-background-color: #f5f1e5;");
         setPadding(new Insets(16, 24, 16, 24));
 
-        returnButton.setId("returnToKinematicsButton");
-        returnButton.getStyleClass().add("transport-primary");
-        returnButton.setStyle("-fx-font-size: 11px; -fx-padding: 10 18 10 18;");
-        returnButton.setOnAction(e -> {
-            if (onReturnToKinematics != null) {
-                onReturnToKinematics.run();
-            }
-        });
-
-        this.standardContent = buildContent();
         this.relativeMotionWorkbench = new RelativeMotionWorkbenchView(new RelativeMotionSimulationController());
         this.relativeMotionWorkbench.setOnReturnToKinematics(() -> {
             if (onReturnToKinematics != null) {
@@ -67,15 +63,86 @@ final class PlannedChapterView extends BorderPane {
             }
         });
 
+        this.riverBoatWorkbench = new RiverBoatWorkbenchView(new RiverBoatSimulationController());
+        this.riverBoatWorkbench.setOnReturnToKinematics(() -> {
+            if (onReturnToKinematics != null) {
+                onReturnToKinematics.run();
+            }
+        });
+
+        returnButton.setId("returnToKinematicsButton");
+        returnButton.getStyleClass().add("transport-primary");
+        returnButton.setStyle("-fx-font-size: 11px; -fx-padding: 10 18 10 18;");
+        returnButton.setOnAction(e -> {
+            relativeMotionWorkbench.controller().pause();
+            riverBoatWorkbench.controller().pause();
+            if (onReturnToKinematics != null) {
+                onReturnToKinematics.run();
+            }
+        });
+
+        this.standardContent = buildContent();
+        setupChapter2Container();
         setCenter(standardContent);
+    }
+
+    private void setupChapter2Container() {
+        btnExpTwoProjectile.setId("btnExpTwoProjectile");
+        btnExpRiverBoat.setId("btnExpRiverBoat");
+
+        btnExpTwoProjectile.setOnAction(e -> selectChapter2Experiment(1));
+        btnExpRiverBoat.setOnAction(e -> selectChapter2Experiment(2));
+
+        HBox subNav = new HBox(8, btnExpTwoProjectile, btnExpRiverBoat);
+        subNav.setAlignment(Pos.CENTER_LEFT);
+        subNav.setPadding(new Insets(0, 0, 10, 0));
+
+        chapter2Container.setTop(subNav);
+        selectChapter2Experiment(1); // Default to Experiment 2.1
+    }
+
+    void selectChapter2Experiment(int experimentIndex) {
+        if (experimentIndex == 2) {
+            relativeMotionWorkbench.controller().pause();
+            chapter2Container.setCenter(riverBoatWorkbench);
+            styleActiveButton(btnExpRiverBoat, true);
+            styleActiveButton(btnExpTwoProjectile, false);
+        } else {
+            riverBoatWorkbench.controller().pause();
+            chapter2Container.setCenter(relativeMotionWorkbench);
+            styleActiveButton(btnExpTwoProjectile, true);
+            styleActiveButton(btnExpRiverBoat, false);
+        }
+    }
+
+    private void styleActiveButton(Button btn, boolean active) {
+        if (active) {
+            btn.setStyle("-fx-background-color: #2453d4; -fx-text-fill: white; -fx-font-weight: bold; " +
+                    "-fx-font-size: 11px; -fx-padding: 6 14 6 14; -fx-border-color: #1e40af; -fx-border-radius: 4px; -fx-background-radius: 4px;");
+        } else {
+            btn.setStyle("-fx-background-color: #e9e2d0; -fx-text-fill: #142e4b; -fx-font-weight: bold; " +
+                    "-fx-font-size: 11px; -fx-padding: 6 14 6 14; -fx-border-color: #cbc4b4; -fx-border-radius: 4px; -fx-background-radius: 4px;");
+        }
     }
 
     RelativeMotionWorkbenchView relativeMotionWorkbench() {
         return relativeMotionWorkbench;
     }
 
+    RiverBoatWorkbenchView riverBoatWorkbench() {
+        return riverBoatWorkbench;
+    }
+
     Button returnButton() {
         return returnButton;
+    }
+
+    Button btnExpTwoProjectile() {
+        return btnExpTwoProjectile;
+    }
+
+    Button btnExpRiverBoat() {
+        return btnExpRiverBoat;
     }
 
     private VBox buildContent() {
@@ -127,9 +194,13 @@ final class PlannedChapterView extends BorderPane {
 
     void setChapter(ChapterCapability chapter) {
         if (chapter.number() == 2) {
-            setCenter(relativeMotionWorkbench);
+            setCenter(chapter2Container);
             return;
         }
+
+        // Pause active simulations when navigating away from Chapter 02
+        relativeMotionWorkbench.controller().pause();
+        riverBoatWorkbench.controller().pause();
 
         setCenter(standardContent);
         chapterHeader.setText(String.format("CHAPTER %s   /   JEE MECHANICS", chapter.formattedNumber()));
@@ -151,6 +222,11 @@ final class PlannedChapterView extends BorderPane {
         this.onReturnToKinematics = callback;
     }
 
+    void dispose() {
+        relativeMotionWorkbench.dispose();
+        riverBoatWorkbench.dispose();
+    }
+
     private static Node rule() {
         Region rule = new Region();
         rule.setPrefHeight(1);
@@ -158,4 +234,3 @@ final class PlannedChapterView extends BorderPane {
         return rule;
     }
 }
-
