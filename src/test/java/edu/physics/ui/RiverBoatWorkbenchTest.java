@@ -8,6 +8,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class RiverBoatWorkbenchTest {
             assertNotNull(view.controller());
             assertNotNull(view.returnButton());
             assertNotNull(view.presetCombo());
-            assertNotNull(view.headingSlider());
+            assertNotNull(view.headingInput());
 
             RiverBoatSimulationModel model = controller.model();
             assertNotNull(model);
@@ -93,14 +94,14 @@ class RiverBoatWorkbenchTest {
     }
 
     @Test
-    @DisplayName("Interactive slider adjustments dynamically update model and vectors")
+    @DisplayName("Interactive numeric input adjustments dynamically update model and vectors")
     void testSliderAdjustments() throws Exception {
         FxTestRuntime.runOnFxThread(() -> {
             RiverBoatSimulationController controller = new RiverBoatSimulationController();
             RiverBoatWorkbenchView view = new RiverBoatWorkbenchView(controller);
 
-            // Adjust steering angle slider to 0 degrees
-            view.headingSlider().setValue(0.0);
+            // Adjust steering angle to 0 degrees via text field
+            view.headingInput().setText("0.0");
 
             RiverBoatSimulationModel updated = controller.model();
             assertEquals(0.0, updated.headingAngleDeg(), 0.1);

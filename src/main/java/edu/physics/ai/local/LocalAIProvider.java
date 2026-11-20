@@ -35,7 +35,11 @@ public final class LocalAIProvider implements AIProvider {
     private static final Pattern HORIZONTAL_PATTERN = Pattern.compile(
             "(?i)\\b(?:horizontally|horizontal projection)\\b");
     private static final Pattern GRAVITY_PATTERN = Pattern.compile(
-            "(?i)(?:g\\s*=\\s*|gravity\\s*(?:of|=|is)?\\s*|take\\s+g\\s*=\\s*)(\\d+(?:\\.\\d+)?)\\s*(?:m/s\\^?2|mps2)?");
+            "(?i)(?:" +
+            "g\\s*=\\s*" +                                                // g = 10
+            "|gravity\\s*(?:\\(g\\))?\\s*(?:of|=|is|as)?\\s*" +           // gravity (g) as 10, gravity = 10
+            "|tak(?:e|ing)\\s+(?:gravity\\s*(?:\\(g\\))?\\s*(?:as|=|is)?\\s*|g\\s*(?:=|as)\\s*)" + // Taking gravity (g) as 10, take g = 10
+            ")(\\d+(?:\\.\\d+)?)\\s*(?:m/s[\\^]?2|m/s\u00b2|mps2)?");     // m/s^2, m/s², m/s2
     private static final Pattern TOWER_HEIGHT_PATTERN = Pattern.compile(
             "(?i)(?:from\\s+(?:a\\s+)?(?:tower|cliff|platform|height)\\s+(?:of\\s+)?|initial\\s+height\\s*(?:of|=|is)?\\s*)(\\d+(?:\\.\\d+)?)\\s*(?:m|meters|metres)\\b");
     private static final Pattern TIME_PARAM_PATTERN = Pattern.compile(

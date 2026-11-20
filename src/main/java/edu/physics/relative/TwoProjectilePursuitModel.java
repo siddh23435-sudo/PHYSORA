@@ -1,5 +1,6 @@
 package edu.physics.relative;
 
+import edu.physics.problem.PhysicsConstants;
 import edu.physics.simulation.Vector2D;
 import java.util.Objects;
 import java.util.OptionalDouble;
@@ -13,7 +14,7 @@ import java.util.OptionalDouble;
  */
 public final class TwoProjectilePursuitModel {
 
-    public static final double DEFAULT_GRAVITY = 9.8; // m/s²
+    public static final double DEFAULT_GRAVITY = PhysicsConstants.STANDARD_GRAVITY_JEE; // 9.80 m/s² textbook preset
 
     private final RelativeBody2D bodyA;
     private final RelativeBody2D bodyB;

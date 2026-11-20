@@ -209,7 +209,7 @@ public final class PhysicsCapabilityRegistry {
                     ChapterStatus.AVAILABLE),
             new ChapterCapability(2, "relative-motion", "Relative Motion",
                     "Inertial reference frames, 1D/2D relative velocity, river-boat crossing and rain-umbrella drift problems.",
-                    ChapterStatus.PLANNED),
+                    ChapterStatus.AVAILABLE),
             new ChapterCapability(3, "laws-of-motion", "Laws of Motion",
                     "Newton's laws of motion, free-body diagrams, static & kinetic friction, coupled pulley-block systems.",
                     ChapterStatus.PLANNED),

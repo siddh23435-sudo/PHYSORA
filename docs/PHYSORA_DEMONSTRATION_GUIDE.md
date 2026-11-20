@@ -24,7 +24,7 @@ PHYSORA enforces strict mathematical and architectural boundaries:
 | Chapter | Title | Status | Capability in Product |
 |---|---|---|---|
 | **01** | **Kinematics** | **LIVE** | Full interactive 2D simulation, prediction challenges, dual-experiment overlay comparison, 6-stage guided derivations, grounded AI assistance. |
-| **02** | **Relative Motion** | **PLANNED** | Informative curriculum roadmap (Inertial frames, river-boat, rain-umbrella drift) with 1-click return to Kinematics. |
+| **02** | **Relative Motion** | **LIVE** | 4 interactive workbenches (Two-Projectile Pursuit & Dynamic Velocity Triangle, River-Boat Crossing & Navigation Modes, Rain-Man Umbrella Alignment & Rating, Inverse Rain Investigator 5-Stage Reconstruction & Conditioning) with 1-click reciprocal return to Kinematics. |
 | **03** | **Laws of Motion** | **PLANNED** | Curriculum roadmap (Newton's laws, FBDs, friction, coupled pulleys). |
 | **04** | **Work & Energy** | **PLANNED** | Curriculum roadmap (Work-Energy theorem, potential energy curves, power). |
 | **05** | **Momentum & Collisions** | **PLANNED** | Curriculum roadmap (Impulse, conservation of momentum, 1D/2D collisions). |
@@ -51,7 +51,7 @@ From the repository root:
 ```powershell
 .\mvnw.cmd test
 ```
-*Current Suite Baseline: 412 automated tests, 0 failures, 0 errors, 0 skipped.*
+*Current Suite Baseline: 602 automated tests, 0 failures, 0 errors, 0 skipped. Build status: BUILD SUCCESS.*
 
 ---
 
@@ -148,11 +148,32 @@ This reproducible script walks an evaluator or teacher through PHYSORA's complet
    **⚠ EXPERIMENT CONTEXT STALE — Simulation parameters modified since attachment.**
 7. Click **↺ REFRESH** to re-synchronize the context card with the live simulation.
 
+### Step 7: Chapter 02 Relative Motion Workbenches (1.5 Minutes)
+1. In the left navigation rail, click **02 Relative Motion** (badged with green **LIVE** pill).
+2. Note that active Kinematics simulation is reciprocally paused.
+3. Walk through the 4 interactive workbenches:
+   - **Workbench 2.1: Two-Projectile Pursuit & Reference Frames**
+     - Observe Ground, Observer A, and Observer B reference frame views.
+     - Note the **Dynamic Velocity Triangle** header ($\vec{v}_B(t) = \vec{v}_A(t) + \vec{v}_{B/A}$) confirming that the relative velocity remains strictly constant in uniform gravity.
+     - Inspect the flagship collision preset at $t = 2.500\text{ s}$, $(50.0, 30.6)\text{ m}$.
+   - **Workbench 2.2: River-Boat Vector Crossing**
+     - Review the resultant ground velocity triangle ($\vec{v}_{b/g} = \vec{v}_{b/r} + \vec{u}$).
+     - Toggle between Shortest Path (drift-canceling heading $\theta = \arcsin(u/v_b)$) and Quickest Crossing ($\theta = 90^\circ$).
+   - **Workbench 2.3: Rain-Man Umbrella Alignment**
+     - Inspect the **Angular Alignment Error ($|\Delta\phi|$)** and **Alignment Rating** badge.
+     - Demonstrate the **Snap to Optimal Tilt** button aligning the shaft along $-\vec{v}_{r/m}$.
+   - **Workbench 2.4: Inverse Rain Investigator**
+     - Step through the 5 pedagogical stages: Evidence $\to$ Ambiguity (candidate slider) $\to$ Geometry (intersection of velocity-space rays) $\to$ Reconstruction $\to$ Round-Trip Forward Verification.
+     - Highlight the mathematical condition number diagnostic:
+       $$\kappa_{\text{down}} = \frac{\sqrt{\sec^4\phi_1 + \sec^4\phi_2}}{|\tan\phi_2 - \tan\phi_1|}$$
+       distinguishing numerically stable presets from near-parallel ill-conditioned configurations.
+4. Click **◀ RETURN TO KINEMATICS** to seamlessly restore the Chapter 01 Kinematics bench with reciprocal simulation pausing.
+
 ---
 
 ## 6. Known Constraints & Non-Goals
 
-1. **Curriculum Scope**: Chapters 02 through 08 are planned curriculum roadmaps; interactive solvers for non-Kinematics chapters are intentionally deferred to future milestones.
+1. **Curriculum Scope**: Chapters 01 (Kinematics) and 02 (Relative Motion) are fully interactive and live. Chapters 03 through 08 remain planned curriculum roadmaps; interactive solvers for chapters 03–08 are scheduled for subsequent curriculum milestones.
 2. **Ideal 2D Mechanics**: Air resistance, Coriolis forces, and variable gravity are deliberately excluded to adhere to Class 11–12 JEE syllabus foundations.
 3. **AI Boundaries**: AI is strictly constrained to natural-language problem interpretation and qualitative explanation; the Java physics engine is the sole source of truth for numerical answers.
 

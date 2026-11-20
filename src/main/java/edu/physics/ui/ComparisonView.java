@@ -219,32 +219,32 @@ final class ComparisonView extends BorderPane {
         grid.setVgap(6);
 
         ColumnConstraints c0 = new ColumnConstraints();
-        c0.setPrefWidth(135);
-        c0.setMinWidth(115);
+        c0.setPrefWidth(125);
+        c0.setMinWidth(110);
 
         ColumnConstraints c1 = new ColumnConstraints();
-        c1.setPrefWidth(85);
-        c1.setMinWidth(70);
+        c1.setPrefWidth(95);
+        c1.setMinWidth(80);
 
         ColumnConstraints c2 = new ColumnConstraints();
-        c2.setPrefWidth(85);
-        c2.setMinWidth(70);
+        c2.setPrefWidth(95);
+        c2.setMinWidth(80);
 
         ColumnConstraints c3 = new ColumnConstraints();
-        c3.setPrefWidth(85);
-        c3.setMinWidth(70);
+        c3.setPrefWidth(95);
+        c3.setMinWidth(80);
 
         ColumnConstraints c4 = new ColumnConstraints();
         c4.setHgrow(Priority.ALWAYS);
-        c4.setMinWidth(160);
+        c4.setMinWidth(150);
         c4.setMaxWidth(Double.MAX_VALUE);
         grid.getColumnConstraints().setAll(c0, c1, c2, c3, c4);
 
         // Header row
         Label h0 = tableHeader("Metric");
-        Label h1 = tableHeader("Experiment A (Blue)");
-        Label h2 = tableHeader("Experiment B (Amber)");
-        Label h3 = tableHeader("Difference (B - A)");
+        Label h1 = tableHeader("Exp A (Blue)");
+        Label h2 = tableHeader("Exp B (Amber)");
+        Label h3 = tableHeader("Δ (B - A)");
         Label h4 = tableHeader("Physical Insight");
         grid.addRow(0, h0, h1, h2, h3, h4);
 

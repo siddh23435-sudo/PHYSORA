@@ -129,7 +129,7 @@ class ProjectileSimulationControllerTest {
     void applicationStartsAndViewNavigationCanBeRepeated() throws Exception {
         withApplication((stage, shell, root) -> {
             assertTrue(stage.isShowing());
-            assertNotNull(node(root, "launchSpeedSlider", Slider.class));
+            assertNotNull(node(root, "launchSpeedInput", TextField.class));
             assertNotNull(node(root, "initialXInput", TextField.class));
             assertNotNull(node(root, "initialYInput", TextField.class));
             assertNotNull(node(root, "landingYInput", TextField.class));
@@ -243,7 +243,9 @@ class ProjectileSimulationControllerTest {
             timeline.setValue(0.75);
             assertEquals(0.75, shell.controller().simulationTimeProperty().get(), 1e-12);
 
-            node(root, "launchSpeedSlider", Slider.class).setValue(30.0);
+            TextField speedField = node(root, "launchSpeedInput", TextField.class);
+            speedField.setText("30.0");
+            speedField.fireEvent(new javafx.event.ActionEvent());
             node(root, "initialXInput", TextField.class).setText("8");
             reset.fire();
             assertEquals(0.0, shell.controller().simulationTimeProperty().get(), 0.0);
@@ -291,7 +293,9 @@ class ProjectileSimulationControllerTest {
             node(root, "initialXInput", TextField.class).setText("0");
             node(root, "initialYInput", TextField.class).setText("0");
             node(root, "landingYInput", TextField.class).setText("5");
-            node(root, "launchAngleSlider", Slider.class).setValue(60);
+            TextField launchAngle = node(root, "launchAngleInput", TextField.class);
+            launchAngle.setText("60");
+            launchAngle.fireEvent(new javafx.event.ActionEvent());
             ProjectileMotion higherPlatform = shell.controller().model();
             double higherLandingTime = higherPlatform.timeOfFlight().orElseThrow();
             assertTrue(higherLandingTime > higherPlatform.timeToApex().orElseThrow());
@@ -305,7 +309,8 @@ class ProjectileSimulationControllerTest {
 
             node(root, "initialYInput", TextField.class).setText("5");
             node(root, "landingYInput", TextField.class).setText("-3");
-            node(root, "launchAngleSlider", Slider.class).setValue(40);
+            launchAngle.setText("40");
+            launchAngle.fireEvent(new javafx.event.ActionEvent());
             ProjectileMotion lowerPlatform = shell.controller().model();
             double lowerLandingTime = lowerPlatform.timeOfFlight().orElseThrow();
             assertEquals(-3.0, lowerPlatform.stateAt(lowerLandingTime).y(), 1e-9);
@@ -314,8 +319,11 @@ class ProjectileSimulationControllerTest {
                     node(root, "flightOutput", Label.class).getText());
             capture(root, output.resolve("04-lower-landing.png"));
 
-            node(root, "launchSpeedSlider", Slider.class).setValue(15);
-            node(root, "launchAngleSlider", Slider.class).setValue(30);
+            TextField speedField = node(root, "launchSpeedInput", TextField.class);
+            speedField.setText("15");
+            speedField.fireEvent(new javafx.event.ActionEvent());
+            launchAngle.setText("30");
+            launchAngle.fireEvent(new javafx.event.ActionEvent());
             capture(root, output.resolve("05-speed-and-angle-change.png"));
 
             node(root, "logicViewTab", ToggleButton.class).fire();

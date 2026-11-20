@@ -41,7 +41,6 @@ final class NormalBenchView extends BorderPane {
     private final Label flightOutput = outputValue();
     private final Label rangeOutput = outputValue();
     private final Label clockOutput = new Label("t = 0.00 s");
-    private final Map<TextField, javafx.beans.property.DoubleProperty> numericControls = new IdentityHashMap<>();
     private boolean updatingTimeSlider;
     private Node simulationFooter;
 
@@ -72,6 +71,10 @@ final class NormalBenchView extends BorderPane {
         aiProblemView.setManaged(false);
 
         getStyleClass().add("bench-view");
+        var stylesheet = getClass().getResource("/edu/physics/ui/physora.css");
+        if (stylesheet != null) {
+            getStylesheets().add(stylesheet.toExternalForm());
+        }
         setTop(buildTop());
         HBox workArea = new HBox(20, buildViews(), buildInspector());
         workArea.setPadding(new Insets(0, 24, 8, 24));
@@ -109,25 +112,19 @@ final class NormalBenchView extends BorderPane {
     }
 
     private VBox buildTop() {
-        Label mark = eyebrow("01 · KINEMATICS");
+        Label mark = eyebrow("PHYSORA CHAPTER 01 / KINEMATICS");
         mark.getStyleClass().add("hero-kicker");
         Label title = new Label("IDEAL PROJECTILE MOTION");
-        title.setFont(Font.font("Georgia", FontWeight.BOLD, 18));
+        title.setFont(Font.font("Georgia", FontWeight.BOLD, 20));
         title.setTextFill(PhysoraTheme.INK);
         Label subtitle = muted("Constant Downward Gravity · 2D Motion in Vectors");
         VBox titleBlock = new VBox(2, mark, title, subtitle);
         HBox.setHgrow(titleBlock, Priority.ALWAYS);
 
-        VBox notation = new VBox(2,
-                eyebrow("INITIAL VELOCITY"),
-                notation("v0 = (vx0, vy0)"));
-        notation.getStyleClass().add("hero-notation");
-        notation.setAlignment(Pos.CENTER_LEFT);
-
         HBox viewBar = buildViewBar();
-        HBox topBar = new HBox(16, titleBlock, notation, viewBar);
+        HBox topBar = new HBox(16, titleBlock, viewBar);
         topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setPadding(new Insets(8, 24, 8, 24));
+        topBar.setPadding(new Insets(10, 24, 10, 24));
         topBar.setStyle("-fx-border-color: transparent transparent #cbc4b4 transparent; -fx-background-color: #f5f1e5;");
         return new VBox(topBar);
     }
@@ -178,43 +175,71 @@ final class NormalBenchView extends BorderPane {
     }
 
     private Node buildInspector() {
-        VBox inspector = new VBox(19);
-        inspector.setPadding(new Insets(20, 18, 18, 18));
+        VBox inspector = new VBox(8);
+        inspector.setPadding(new Insets(10, 10, 10, 10));
         inspector.getStyleClass().add("model-inspector");
 
         Label heading = eyebrow("MODEL INSPECTOR");
+        heading.getStyleClass().add("inspector-heading");
         Label subheading = new Label("Initial conditions");
         subheading.getStyleClass().add("inspector-title");
-        VBox intro = new VBox(5, heading, subheading);
+        VBox intro = new VBox(2, heading, subheading);
 
-        Slider speed = parameterSlider(0, 50, 20, 1);
-        Slider angle = parameterSlider(0, 90, 45, 1);
-        Slider gravity = parameterSlider(0, 20, 9.81, 0.1);
-        speed.setId("launchSpeedSlider");
-        angle.setId("launchAngleSlider");
-        gravity.setId("gravitySlider");
-        speed.valueProperty().bindBidirectional(controller.launchSpeedProperty());
-        angle.valueProperty().bindBidirectional(controller.launchAngleProperty());
-        gravity.valueProperty().bindBidirectional(controller.gravityProperty());
+        NumericParameterRow speedRow = new NumericParameterRow(
+                "Launch speed (v₀)", "m/s", "launchSpeedInput",
+                controller.launchSpeedProperty().get(), 0.0, 100.0, "%.2f",
+                controller.launchSpeedProperty()::set
+        );
+        NumericParameterRow angleRow = new NumericParameterRow(
+                "Launch angle (θ)", "°", "launchAngleInput",
+                controller.launchAngleProperty().get(), 0.0, 90.0, "%.2f",
+                controller.launchAngleProperty()::set
+        );
+        NumericParameterRow gravityRow = new NumericParameterRow(
+                "Gravity (g)", "m/s²", "gravityInput",
+                controller.gravityProperty().get(), 0.1, 50.0, "%.2f",
+                controller.gravityProperty()::set
+        );
 
-        VBox coordinates = new VBox(10,
+        controller.launchSpeedProperty().addListener((obs, o, n) -> speedRow.setValue(n.doubleValue()));
+        controller.launchAngleProperty().addListener((obs, o, n) -> angleRow.setValue(n.doubleValue()));
+        controller.gravityProperty().addListener((obs, o, n) -> gravityRow.setValue(n.doubleValue()));
+
+        NumericParameterRow initXRow = new NumericParameterRow(
+                "Initial position (x₀)", "m", "initialXInput",
+                controller.initialXProperty().get(), -500.0, 500.0, "%.2f",
+                controller.initialXProperty()::set
+        );
+        NumericParameterRow initYRow = new NumericParameterRow(
+                "Initial elevation (y₀)", "m", "initialYInput",
+                controller.initialYProperty().get(), 0.0, 500.0, "%.2f",
+                controller.initialYProperty()::set
+        );
+        NumericParameterRow landingYRow = new NumericParameterRow(
+                "Landing boundary (y_land)", "m", "landingYInput",
+                controller.landingYProperty().get(), -500.0, 500.0, "%.2f",
+                controller.landingYProperty()::set
+        );
+
+        controller.initialXProperty().addListener((obs, o, n) -> initXRow.setValue(n.doubleValue()));
+        controller.initialYProperty().addListener((obs, o, n) -> initYRow.setValue(n.doubleValue()));
+        controller.landingYProperty().addListener((obs, o, n) -> landingYRow.setValue(n.doubleValue()));
+
+        VBox inputs = new VBox(6,
+                eyebrow("LAUNCH PARAMETERS"),
+                speedRow, angleRow, gravityRow);
+        inputs.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8 10 8 10;");
+
+        VBox coordinates = new VBox(6,
                 eyebrow("LAUNCH AND LANDING"),
-                numericInput("Initial x", "m", "initialXInput", controller.initialXProperty()),
-                numericInput("Initial y", "m", "initialYInput", controller.initialYProperty()),
-                numericInput("Landing height", "m", "landingYInput", controller.landingYProperty()));
+                initXRow, initYRow, landingYRow);
+        coordinates.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8 10 8 10;");
 
-        VBox inputs = new VBox(20,
-                parameter("Launch speed", "m/s", speed, controller.launchSpeedProperty()),
-                parameter("Launch angle", "°", angle, controller.launchAngleProperty()),
-                parameter("Gravity", "m/s²", gravity, controller.gravityProperty()));
-
-        Node separator = separator();
         Label assumptionsTitle = eyebrow("MODEL ASSUMPTIONS");
         Label assumptions = new Label();
         assumptions.setId("assumptionsOutput");
         refreshAssumptions(assumptions);
         assumptions.getStyleClass().add("assumption-copy");
-        VBox assumptionsBlock = new VBox(9, assumptionsTitle, assumptions);
         controller.modelProperty().addListener((obs, oldModel, newModel) -> refreshAssumptions(assumptions));
 
         Label vectorTitle = eyebrow("SIMULATION OVERLAY");
@@ -223,166 +248,49 @@ final class NormalBenchView extends BorderPane {
         vectors.getStyleClass().add("vector-toggle");
         vectors.selectedProperty().addListener((obs, oldValue, newValue) ->
                 simulationView.setShowVelocityComponents(newValue));
-        VBox overlayBlock = new VBox(8, vectorTitle, vectors);
 
-        Button restoreDefaults = new Button("RESTORE DEFAULTS");
+        VBox overlayBlock = new VBox(6, assumptionsTitle, assumptions, separator(), vectorTitle, vectors);
+        overlayBlock.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8 10 8 10;");
+
+        Button restoreDefaults = new Button("↺  RESTORE DEFAULTS");
         restoreDefaults.setId("restoreDefaultsButton");
         restoreDefaults.getStyleClass().add("transport-secondary");
         restoreDefaults.setMaxWidth(Double.MAX_VALUE);
+        restoreDefaults.setStyle("-fx-font-size: 11px; -fx-padding: 7 12 7 12; -fx-font-weight: bold;");
         restoreDefaults.setOnAction(event -> {
             controller.restoreDefaults();
-            numericControls.forEach((field, property) -> field.setText(formatInput(property.get())));
+            speedRow.setValue(controller.launchSpeedProperty().get());
+            angleRow.setValue(controller.launchAngleProperty().get());
+            gravityRow.setValue(controller.gravityProperty().get());
+            initXRow.setValue(controller.initialXProperty().get());
+            initYRow.setValue(controller.initialYProperty().get());
+            landingYRow.setValue(controller.landingYProperty().get());
         });
-        VBox defaultsBlock = new VBox(8, eyebrow("EXPERIMENT RESET"), restoreDefaults);
+        VBox defaultsBlock = new VBox(6, eyebrow("EXPERIMENT RESET"), restoreDefaults);
+        defaultsBlock.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8 10 8 10;");
 
-        inspector.getChildren().addAll(intro, separator, inputs, separator(), coordinates, separator(), assumptionsBlock,
-                separator(), overlayBlock, separator(), defaultsBlock);
+        inspector.getChildren().addAll(intro, inputs, coordinates, overlayBlock, defaultsBlock);
         ScrollPane scroll = new ScrollPane(inspector);
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scroll.setPrefViewportWidth(286);
-        scroll.setMinWidth(260);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroll.setPrefViewportWidth(295);
+        scroll.setMinWidth(280);
         scroll.setMaxHeight(Double.MAX_VALUE);
         scroll.getStyleClass().add("inspector-scroll");
+        scroll.setStyle("-fx-background-color: #f5f1e5; -fx-background: #f5f1e5; -fx-border-color: transparent;");
         return scroll;
-    }
-
-    private VBox numericInput(String name, String unit, String id,
-                              javafx.beans.property.DoubleProperty property) {
-        Label label = new Label(name);
-        label.getStyleClass().add("parameter-name");
-        TextField field = new TextField(formatInput(property.get()));
-        field.setId(id);
-        field.setAccessibleText(name + " in " + unit);
-        field.setPrefColumnCount(8);
-        numericControls.put(field, property);
-        Label unitLabel = new Label(unit);
-        unitLabel.getStyleClass().add("parameter-value");
-        Label error = new Label();
-        error.setId(id + "Error");
-        error.getStyleClass().add("validation-message");
-        error.setVisible(false);
-        error.setManaged(false);
-
-        Runnable commit = () -> {
-            String text = field.getText();
-            try {
-                if (text == null || text.isBlank()) throw new NumberFormatException();
-                double value = Double.parseDouble(text.trim());
-                if (!Double.isFinite(value)) throw new NumberFormatException();
-                if (Double.compare(property.get(), value) != 0) {
-                    property.set(value);
-                }
-                field.getStyleClass().remove("input-invalid");
-                error.setText("");
-                error.setVisible(false);
-                error.setManaged(false);
-                field.setText(formatInput(value));
-            } catch (NumberFormatException ex) {
-                if (!field.getStyleClass().contains("input-invalid")) field.getStyleClass().add("input-invalid");
-                error.setText("Enter a finite number.");
-                error.setVisible(true);
-                error.setManaged(true);
-            }
-        };
-
-        field.setOnAction(event -> commit.run());
-
-        field.setOnKeyPressed(event -> {
-            if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE) {
-                field.setText(formatInput(property.get()));
-                field.getStyleClass().remove("input-invalid");
-                error.setText("");
-                error.setVisible(false);
-                error.setManaged(false);
-            }
-        });
-
-        field.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
-            if (!isFocused && wasFocused) {
-                commit.run();
-            }
-        });
-
-        field.textProperty().addListener((obs, oldText, text) -> {
-            if (!field.isFocused()) {
-                // Programmatic update (e.g. from headless test or external code)
-                try {
-                    if (text == null || text.isBlank()) throw new NumberFormatException();
-                    double value = Double.parseDouble(text.trim());
-                    if (!Double.isFinite(value)) throw new NumberFormatException();
-                    if (Double.compare(property.get(), value) != 0) {
-                        property.set(value);
-                    }
-                    field.getStyleClass().remove("input-invalid");
-                    error.setText("");
-                    error.setVisible(false);
-                    error.setManaged(false);
-                } catch (NumberFormatException ex) {
-                    if (!field.getStyleClass().contains("input-invalid")) field.getStyleClass().add("input-invalid");
-                    error.setText("Enter a finite number.");
-                    error.setVisible(true);
-                    error.setManaged(true);
-                }
-            } else {
-                // Interactive typing: clear error if syntax is now valid, but DO NOT commit while typing
-                try {
-                    if (text != null && !text.isBlank()) {
-                        double v = Double.parseDouble(text.trim());
-                        if (Double.isFinite(v)) {
-                            field.getStyleClass().remove("input-invalid");
-                            error.setText("");
-                            error.setVisible(false);
-                            error.setManaged(false);
-                        }
-                    }
-                } catch (NumberFormatException ignored) {
-                    // Do not flash validation errors while user is actively typing
-                }
-            }
-        });
-
-        property.addListener((obs, oldValue, newValue) -> {
-            if (!field.isFocused()) {
-                String formatted = formatInput(newValue.doubleValue());
-                if (!field.getText().equals(formatted)) {
-                    field.setText(formatted);
-                }
-            }
-        });
-        return new VBox(5, label, new HBox(8, field, unitLabel), error);
     }
 
     private void refreshAssumptions(Label assumptions) {
         ProjectileMotion model = controller.model();
         assumptions.setText(String.format(Locale.ROOT,
-                "2D motion\nConstant downward gravity\nAir resistance ignored\nLaunch (%.2f, %.2f) m\nLanding surface y = %.2f m",
-                model.initialX(), model.initialY(), model.landingY()));
+                "2D motion\nConstant downward gravity (g = %.2f m/s²)\nAir resistance ignored\nLaunch (%.2f, %.2f) m\nLanding surface y = %.2f m",
+                model.gravity(), model.initialX(), model.initialY(), model.landingY()));
     }
 
     private static String formatInput(double value) {
         return String.format(Locale.ROOT, "%.2f", value);
-    }
-
-    private VBox parameter(String name, String unit, Slider slider, javafx.beans.property.DoubleProperty property) {
-        Label label = new Label(name);
-        label.getStyleClass().add("parameter-name");
-        Label value = new Label();
-        value.getStyleClass().add("parameter-value");
-        ChangeListener<Number> update = (obs, oldValue, newValue) ->
-                value.setText(String.format(Locale.ROOT, "%.2f  %s", newValue.doubleValue(), unit));
-        property.addListener(update);
-        update.changed(null, property.get(), property.get());
-        VBox item = new VBox(8, new HBoxWithTrailing(name, label, value), slider);
-        return item;
-    }
-
-    private static final class HBoxWithTrailing extends HBox {
-        HBoxWithTrailing(String name, Node left, Node right) {
-            super(8, left, spacer(), right);
-            setAlignment(Pos.CENTER_LEFT);
-            HBox.setHgrow(getChildren().get(1), Priority.ALWAYS);
-        }
     }
 
     private VBox buildFooter() {
@@ -484,7 +392,7 @@ final class NormalBenchView extends BorderPane {
         ProjectileMotion model = controller.model();
         ProjectileMotion.State state = model.stateAt(controller.simulationTimeProperty().get());
         positionOutput.setText(String.format(Locale.ROOT, "x %.2f m   /   y %.2f m", state.x(), state.y()));
-        velocityOutput.setText(String.format(Locale.ROOT, "vx %.2f   /   vy %.2f m/s", state.vx(), state.vy()));
+        velocityOutput.setText(String.format(Locale.ROOT, "vₓ %.2f m/s   /   vᵧ %.2f m/s", state.vx(), state.vy()));
         peakOutput.setText(optional(model.maximumHeight(), "m", "unbounded"));
         flightOutput.setText(optional(model.timeOfFlight(), "s", "no landing"));
         rangeOutput.setText(optional(model.horizontalRange(), "m", "no landing"));
@@ -523,18 +431,11 @@ final class NormalBenchView extends BorderPane {
 
     private static VBox result(String title, Label value) {
         Label caption = eyebrow(title);
-        VBox box = new VBox(5, caption, value);
+        caption.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        caption.setStyle("-fx-text-fill: #475569;");
+        VBox box = new VBox(3, caption, value);
         box.getStyleClass().add("result-cell");
         return box;
-    }
-
-    private static Slider parameterSlider(double min, double max, double value, double increment) {
-        Slider slider = new Slider(min, max, value);
-        slider.setBlockIncrement(increment);
-        slider.setMajorTickUnit((max - min) / 3.0);
-        slider.setMaxWidth(Double.MAX_VALUE);
-        slider.getStyleClass().add("parameter-slider");
-        return slider;
     }
 
     private static Label eyebrow(String text) {
@@ -558,6 +459,8 @@ final class NormalBenchView extends BorderPane {
     private static Label outputValue() {
         Label label = new Label("—");
         label.getStyleClass().add("result-value");
+        label.setFont(Font.font("Consolas", FontWeight.BOLD, 13.5));
+        label.setStyle("-fx-text-fill: #0f172a;");
         return label;
     }
 

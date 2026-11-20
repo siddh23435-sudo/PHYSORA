@@ -107,10 +107,10 @@ final class TrajectoryViewport {
 
         Objects.requireNonNull(model, "model is required");
 
-        double left = 68.0;
-        double right = Math.max(left + 100.0, canvasWidth - 28.0);
-        double top = 28.0;
-        double bottom = Math.max(top + 80.0, canvasHeight - 48.0);
+        double left = 56.0;
+        double right = Math.max(left + 100.0, canvasWidth - 24.0);
+        double top = 24.0;
+        double bottom = Math.max(top + 80.0, canvasHeight - 42.0);
         double availW = right - left;
         double availH = bottom - top;
 
@@ -151,15 +151,17 @@ final class TrajectoryViewport {
         double effMaxY = (rawSpanY < MIN_PHYSICAL_SPAN_Y) ? (centerY + spanY / 2.0) : bMaxY;
 
         // 3. Calculate isotropic scale (pixels per meter identical on both axes)
-        double scaleX = availW / (spanX * PADDING_FACTOR_X);
-        double scaleY = availH / (spanY * PADDING_FACTOR_Y);
+        double scaleX = availW / (spanX * 1.08);
+        double bottomAnchor = bottom - 6.0;
+        double scaleY = (availH - 18.0) / (spanY * 1.06);
         double scale = Math.min(scaleX, scaleY);
 
         // 4. Calculate screen anchor coordinates
         double screenCenterX = left + availW / 2.0;
-        double screenCenterY = top + availH / 2.0;
-        double originX = screenCenterX - centerX * scale;
-        double groundScreenY = screenCenterY + centerY * scale;
+        double originX = (rawSpanX < MIN_PHYSICAL_SPAN_X)
+                ? screenCenterX
+                : screenCenterX - centerX * scale;
+        double groundScreenY = bottomAnchor + bMinY * scale;
 
         // 5. Generate 1-2-5 decade metric grid ticks
         double xStep = calculateNiceStep(spanX, 5);
@@ -339,10 +341,10 @@ final class TrajectoryViewport {
         Objects.requireNonNull(modelA, "modelA is required");
         Objects.requireNonNull(modelB, "modelB is required");
 
-        double left = 68.0;
-        double right = Math.max(left + 100.0, canvasWidth - 28.0);
-        double top = 28.0;
-        double bottom = Math.max(top + 80.0, canvasHeight - 48.0);
+        double left = 56.0;
+        double right = Math.max(left + 100.0, canvasWidth - 24.0);
+        double top = 24.0;
+        double bottom = Math.max(top + 80.0, canvasHeight - 42.0);
         double availW = right - left;
         double availH = bottom - top;
 
@@ -383,14 +385,16 @@ final class TrajectoryViewport {
         double effMinY = (rawSpanY < MIN_PHYSICAL_SPAN_Y) ? (centerY - spanY / 2.0) : bMinY;
         double effMaxY = (rawSpanY < MIN_PHYSICAL_SPAN_Y) ? (centerY + spanY / 2.0) : bMaxY;
 
-        double scaleX = availW / (spanX * PADDING_FACTOR_X);
-        double scaleY = availH / (spanY * PADDING_FACTOR_Y);
+        double scaleX = availW / (spanX * 1.08);
+        double bottomAnchor = bottom - 6.0;
+        double scaleY = (availH - 18.0) / (spanY * 1.06);
         double scale = Math.min(scaleX, scaleY);
 
         double screenCenterX = left + availW / 2.0;
-        double screenCenterY = top + availH / 2.0;
-        double originX = screenCenterX - centerX * scale;
-        double groundScreenY = screenCenterY + centerY * scale;
+        double originX = (rawSpanX < MIN_PHYSICAL_SPAN_X)
+                ? screenCenterX
+                : screenCenterX - centerX * scale;
+        double groundScreenY = bottomAnchor + bMinY * scale;
 
         double xStep = calculateNiceStep(spanX, 5);
         double yStep = calculateNiceStep(spanY, 5);

@@ -19,6 +19,7 @@ import edu.physics.ai.gemini.GeminiProviderConfiguration;
 import edu.physics.ai.ollama.OllamaConfiguration;
 import edu.physics.problem.CanonicalSolution;
 import edu.physics.problem.PhysicalQuantity;
+import edu.physics.problem.PhysicsConstants;
 import edu.physics.problem.ProjectileSequenceSolution;
 import edu.physics.problem.ProjectileSolution;
 import edu.physics.problem.ProjectileProblemSolver;
@@ -1074,8 +1075,59 @@ final class AIProblemView extends BorderPane {
         if (items.isEmpty() && validation.completenessReport() != null) {
             items.addAll(validation.completenessReport().unresolvedConditions());
         }
-        return String.join("\n", items);
+        // Translate internal diagnostic codes into student-readable explanations
+        return String.join("\n", items.stream().map(AIProblemView::humanizeDiagnostic).toList());
     }
+
+    /** Converts internal validation codes to student-friendly messages. */
+    private static String humanizeDiagnostic(String code) {
+        if (code == null) return "";
+        if (code.startsWith("incompatible-unit:")) {
+            String param = humanizeParamName(code.substring("incompatible-unit:".length()));
+            return "The unit for \"" + param + "\" could not be verified. "
+                    + "Please check that this value has the correct physical unit.";
+        }
+        if (code.startsWith("canonical-given-parameter-mismatch:")) {
+            String param = humanizeParamName(code.substring("canonical-given-parameter-mismatch:".length()));
+            return "The interpreted value for \"" + param + "\" could not be matched to the problem model. "
+                    + "Try rephrasing or specifying the value with its unit.";
+        }
+        if (code.startsWith("canonical-target-parameter-mismatch:")) {
+            String[] parts = code.substring("canonical-target-parameter-mismatch:".length()).split(":", 2);
+            String target = parts.length > 0 ? humanizeParamName(parts[0]) : "target";
+            String param = parts.length > 1 ? humanizeParamName(parts[1]) : "parameter";
+            return "For \"" + target + "\", the value of \"" + param + "\" could not be verified against the problem model.";
+        }
+        if (code.startsWith("canonical-target-parameter-missing:")) {
+            String[] parts = code.substring("canonical-target-parameter-missing:".length()).split(":", 2);
+            String target = parts.length > 0 ? humanizeParamName(parts[0]) : "target";
+            String param = parts.length > 1 ? humanizeParamName(parts[1]) : "parameter";
+            return "For \"" + target + "\", the value \"" + param + "\" was provided but is not expected by the solver.";
+        }
+        if (code.startsWith("non-finite-input:")) {
+            String param = humanizeParamName(code.substring("non-finite-input:".length()));
+            return "The value for \"" + param + "\" is not a valid finite number.";
+        }
+        if (code.startsWith("unit-conversion-overflow:")) {
+            String param = humanizeParamName(code.substring("unit-conversion-overflow:".length()));
+            return "The value for \"" + param + "\" overflowed during unit conversion. Please use smaller or standard values.";
+        }
+        if (code.startsWith("conflicting-")) {
+            return "The problem contains conflicting specifications. Please simplify or clarify the conditions.";
+        }
+        // If the code looks like an internal identifier, provide a generic message
+        if (code.contains(":") || code.contains("-")) {
+            return "A validation issue was detected: " + code.replace('-', ' ').replace(":", " - ")
+                    + ". Try rephrasing the question.";
+        }
+        return code;
+    }
+
+    private static String humanizeParamName(String name) {
+        if (name == null || name.isEmpty()) return "unknown";
+        return name.toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+
 
     private String renderSolution(AIWorkflowResult result) {
         StringBuilder text = new StringBuilder();
@@ -1119,18 +1171,18 @@ final class AIProblemView extends BorderPane {
                 text.append("\nPart ").append(part.partIndex() + 1).append(" — ").append(part.target().name())
                         .append(" [").append(part.status()).append("]\n");
                 part.steps().forEach(step -> {
-                    text.append(step.equation().render()).append('\n');
+                    text.append(MathTypography.formatEquation(step.equation())).append('\n');
                     step.substitutions().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                            text.append("  ").append(MathTypography.formatIdentifier(entry.getKey())).append(" = ").append(format(entry.getValue())).append('\n'));
                     step.intermediateResults().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append(" (intermediate)\n"));
+                            text.append("  ").append(MathTypography.formatIdentifier(entry.getKey())).append(" = ").append(format(entry.getValue())).append(" (intermediate)\n"));
                     step.results().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                            text.append("  ").append(MathTypography.formatIdentifier(entry.getKey())).append(" = ").append(format(entry.getValue())).append('\n'));
                 });
                 for (int candidateIndex = 0; candidateIndex < part.candidates().size(); candidateIndex++) {
                     text.append("Candidate ").append(candidateIndex + 1).append('\n');
                     part.candidates().get(candidateIndex).entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                            text.append("  ").append(MathTypography.formatIdentifier(entry.getKey())).append(" = ").append(format(entry.getValue())).append('\n'));
                 }
                 if (!part.diagnostics().isEmpty()) {
                     text.append("Diagnostics:\n");
@@ -1143,18 +1195,18 @@ final class AIProblemView extends BorderPane {
                 text.append("\nPart ").append(part.index() + 1).append(" — ").append(solution.target())
                         .append(" [").append(solution.status()).append("]\n");
                 solution.steps().forEach(step -> {
-                    text.append(step.equation().render()).append('\n');
+                    text.append(MathTypography.formatEquation(step.equation())).append('\n');
                     step.substitutions().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                            text.append("  ").append(MathTypography.formatIdentifier(entry.getKey())).append(" = ").append(format(entry.getValue())).append('\n'));
                     step.intermediateResults().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append(" (intermediate)\n"));
+                            text.append("  ").append(MathTypography.formatIdentifier(entry.getKey())).append(" = ").append(format(entry.getValue())).append(" (intermediate)\n"));
                     step.results().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                            text.append("  ").append(MathTypography.formatIdentifier(entry.getKey())).append(" = ").append(format(entry.getValue())).append('\n'));
                 });
                 for (int candidateIndex = 0; candidateIndex < solution.candidates().size(); candidateIndex++) {
                     text.append("Candidate ").append(candidateIndex + 1).append('\n');
                     solution.candidates().get(candidateIndex).entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-                            text.append("  ").append(entry.getKey()).append(" = ").append(format(entry.getValue())).append('\n'));
+                            text.append("  ").append(MathTypography.formatIdentifier(entry.getKey())).append(" = ").append(format(entry.getValue())).append('\n'));
                 }
             }
         }
@@ -1213,7 +1265,7 @@ final class AIProblemView extends BorderPane {
     }
 
     private static String format(PhysicalQuantity quantity) {
-        return String.format(java.util.Locale.ROOT, "%.6g %s", quantity.value(), quantity.unit().symbol());
+        return String.format(java.util.Locale.ROOT, "%.6g %s", quantity.value(), MathTypography.formatUnit(quantity.unit()));
     }
 
     private static String cleanQuestionDisplay(String question) {
@@ -1230,7 +1282,7 @@ final class AIProblemView extends BorderPane {
             java.util.OptionalDouble g = result.validation().canonicalProblem().gravity();
             if (g.isPresent()) return g.getAsDouble();
         }
-        return 9.8;
+        return PhysicsConstants.STANDARD_GRAVITY_JEE;
     }
 
     private static String extractResultsSummary(AIWorkflowResult result) {
@@ -1259,11 +1311,11 @@ final class AIProblemView extends BorderPane {
     }
 
     private static String formatTargetName(String key) {
-        if ("maximumHeight".equalsIgnoreCase(key)) return "H_max (Maximum Height)";
+        if ("maximumHeight".equalsIgnoreCase(key) || "yMax".equalsIgnoreCase(key)) return "H_{max} (Maximum Height)";
         if ("range".equalsIgnoreCase(key)) return "R (Horizontal Range)";
-        if ("flightTime".equalsIgnoreCase(key) || "totalFlightTime".equalsIgnoreCase(key)) return "T (Total Flight Time)";
-        if ("apexTime".equalsIgnoreCase(key) || "timeToApex".equalsIgnoreCase(key)) return "t_apex (Time to Apex)";
-        return key;
+        if ("flightTime".equalsIgnoreCase(key) || "totalFlightTime".equalsIgnoreCase(key) || "tLanding".equalsIgnoreCase(key)) return "T (Total Flight Time)";
+        if ("apexTime".equalsIgnoreCase(key) || "timeToApex".equalsIgnoreCase(key) || "tApex".equalsIgnoreCase(key)) return "t_{apex} (Time to Apex)";
+        return MathTypography.formatIdentifier(key);
     }
 
     private void showClarifications(List<InterpretationDraft.Clarification> questions) {

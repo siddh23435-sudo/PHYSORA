@@ -8,6 +8,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -51,10 +52,10 @@ class RainManWorkbenchViewTest {
 
             assertNotNull(view.lookup("#rainManWorkbenchView"));
             assertNotNull(view.lookup("#scenarioPresetCombo"));
-            assertNotNull(view.lookup("#vDownSlider"));
-            assertNotNull(view.lookup("#vRainXSlider"));
-            assertNotNull(view.lookup("#vPersonSlider"));
-            assertNotNull(view.lookup("#umbrellaAngleSlider"));
+            assertNotNull(view.lookup("#vDownInput"));
+            assertNotNull(view.lookup("#vRainXInput"));
+            assertNotNull(view.lookup("#vPersonInput"));
+            assertNotNull(view.lookup("#umbrellaAngleInput"));
             assertNotNull(view.lookup("#snapOptimalButton"));
             assertNotNull(view.lookup("#alignmentStatusBadge"));
             assertNotNull(view.lookup("#valOptimalAngle"));
@@ -97,17 +98,17 @@ class RainManWorkbenchViewTest {
     }
 
     @Test
-    @DisplayName("Changing parameter sliders updates simulation model and analytical readouts")
+    @DisplayName("Changing numeric inputs updates simulation model and analytical readouts")
     void testSliderInteractions() throws InterruptedException {
         runOnFxThread(() -> {
             RainManSimulationController controller = new RainManSimulationController();
             RainManWorkbenchView view = new RainManWorkbenchView(controller);
 
-            Slider vDownSlider = (Slider) view.lookup("#vDownSlider");
-            Slider vPersonSlider = (Slider) view.lookup("#vPersonSlider");
+            TextField vDownInput = (TextField) view.lookup("#vDownInput");
+            TextField vPersonInput = (TextField) view.lookup("#vPersonInput");
 
-            vDownSlider.setValue(10.0);
-            vPersonSlider.setValue(0.0); // Stationary person
+            vDownInput.setText("10.0");
+            vPersonInput.setText("0.0"); // Stationary person
 
             assertEquals(10.0, controller.model().vDown(), 1e-6);
             assertEquals(0.0, controller.model().vPerson(), 1e-6);

@@ -63,7 +63,7 @@ public final class TwoProjectileCanvasRenderer {
         }
 
         // 4. Draw Header Overlay Badge for Current Frame
-        drawFrameBadge(gc, frame);
+        drawFrameBadge(gc, frame, model, time);
     }
 
     private void renderGroundFrame(GraphicsContext gc, TwoProjectilePursuitModel model, double time, ViewportBox box) {
@@ -334,19 +334,22 @@ public final class TwoProjectileCanvasRenderer {
                 3
         );
 
-        // Only draw distance text when separation > 20 m to prevent crowding near origin and body
-        if (dist >= 20.0) {
+        // Draw distance badge when separation > 2.0 m
+        if (dist > 2.0) {
             double midX = (ox + ex) / 2.0;
             double midY = (oy + ey) / 2.0 + 16;
-            double badgeW = 60.0;
-            double badgeH = 15.0;
+            double badgeW = 66.0;
+            double badgeH = 16.0;
 
-            gc.setFill(Color.web("#ffffff", 0.85));
+            gc.setFill(Color.web("#ffffff", 0.90));
+            gc.setStroke(Color.web("#cbd5e1"));
+            gc.setLineWidth(0.8);
             gc.fillRoundRect(midX - badgeW / 2.0, midY - 11, badgeW, badgeH, 3, 3);
+            gc.strokeRoundRect(midX - badgeW / 2.0, midY - 11, badgeW, badgeH, 3, 3);
 
             gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
             gc.setFill(COLOR_R_REL);
-            gc.fillText(String.format(Locale.ROOT, "d = %.1f m", dist), midX - 25, midY + 1);
+            gc.fillText(String.format(Locale.ROOT, "d = %.1f m", dist), midX - 26, midY + 1);
         }
     }
 
@@ -514,10 +517,10 @@ public final class TwoProjectileCanvasRenderer {
                 midX - 60, midY);
     }
 
-    private void drawFrameBadge(GraphicsContext gc, ReferenceFrame frame) {
-        // Clean Pedagogical Overlay Card in Upper Left
-        double boxW = 440;
-        double boxH = 52;
+    private void drawFrameBadge(GraphicsContext gc, ReferenceFrame frame, TwoProjectilePursuitModel model, double time) {
+        // High-contrast, structured HUD card in Upper Left
+        double boxW = 460;
+        double boxH = 68;
 
         gc.setFill(Color.web("#142e4b", 0.94));
         gc.fillRoundRect(16, 16, boxW, boxH, 6, 6);
@@ -527,14 +530,32 @@ public final class TwoProjectileCanvasRenderer {
         gc.strokeRoundRect(16, 16, boxW, boxH, 6, 6);
 
         // Classification Pill
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.5));
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.0));
         gc.setFill(Color.web("#d9f26a"));
-        gc.fillText("VIEWING: " + frame.displayName().toUpperCase(), 26, 34);
+        gc.fillText("VIEWING: " + frame.displayName().toUpperCase(), 24, 33);
 
         // Core Physics Principle
-        gc.setFont(Font.font("Segoe UI", 10.5));
+        gc.setFont(Font.font("Segoe UI", 10.0));
         gc.setFill(Color.web("#e2e8f0"));
-        gc.fillText(frame.pedagogicalPrinciple(), 26, 52);
+        gc.fillText(frame.pedagogicalPrinciple(), 24, 49);
+
+        // Dynamic State Readout
+        Vector2D posA = model.positionA(time);
+        Vector2D posB = model.positionB(time);
+        double dist = posA.distanceTo(posB);
+        double vRelMag = model.relativeVelocityBA(time).magnitude();
+
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
+        gc.setFill(Color.web("#38bdf8"));
+        String statusLine;
+        if (model.hasCollision() && model.collisionTime().isPresent()) {
+            statusLine = String.format(Locale.ROOT, "Separation d(t) = %.1f m  |  |v_rel| = %.2f m/s  |  Collision at t* = %.3f s",
+                    dist, vRelMag, model.collisionTime().getAsDouble());
+        } else {
+            statusLine = String.format(Locale.ROOT, "Separation d(t) = %.1f m  |  |v_rel| = %.2f m/s  |  Closest approach d_min = %.2f m",
+                    dist, vRelMag, model.analyticalResult().dMinInterval());
+        }
+        gc.fillText(statusLine, 24, 67);
     }
 
     private void drawGridAndAxes(GraphicsContext gc, ViewportBox box, ReferenceFrame frame) {

@@ -10,6 +10,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -44,19 +45,17 @@ public final class RainManWorkbenchView extends BorderPane {
     private final Slider timeSlider = new Slider();
     private final Label timeReadout = new Label("t = 0.00 s / 30.00 s");
 
-    // Parameter Sliders & Readouts
-    private final Slider vDownSlider = new Slider(2.0, 16.0, 8.0);
-    private final Label vDownLabel = new Label("8.0 m/s");
+    // Physical Scenario Numeric Parameter Inputs (Standardized)
+    private final NumericParameterRow vDownRow = new NumericParameterRow(
+            "Downward Speed (v_d):", "m/s", "vDownInput", 8.0, 1.0, 30.0, "%.1f", v -> onParameterInputChanged());
+    private final NumericParameterRow vRainXRow = new NumericParameterRow(
+            "Horizontal Wind (v_rx):", "m/s", "vRainXInput", 0.0, -25.0, 25.0, "%.1f", v -> onParameterInputChanged());
+    private final NumericParameterRow vPersonRow = new NumericParameterRow(
+            "Walker Velocity (v_m):", "m/s", "vPersonInput", 3.0, -25.0, 25.0, "%.1f", v -> onParameterInputChanged());
 
-    private final Slider vRainXSlider = new Slider(-10.0, 10.0, 0.0);
-    private final Label vRainXLabel = new Label("0.0 m/s");
-
-    private final Slider vPersonSlider = new Slider(-10.0, 10.0, 3.0);
-    private final Label vPersonLabel = new Label("3.0 m/s");
-
-    // Umbrella Angle Controls
-    private final Slider umbrellaAngleSlider = new Slider(-90.0, 90.0, 0.0);
-    private final Label umbrellaAngleLabel = new Label("0.0°");
+    // Umbrella Angle Input & Controls
+    private final NumericParameterRow umbrellaAngleRow = new NumericParameterRow(
+            "Shaft Angle (φ):", "°", "umbrellaAngleInput", 0.0, -89.9, 89.9, "%.1f", v -> onParameterInputChanged());
     private final Button snapOptimalBtn = new Button("🎯 SNAP TO OPTIMAL ANGLE");
 
     private final ComboBox<String> presetCombo = new ComboBox<>();
@@ -71,9 +70,10 @@ public final class RainManWorkbenchView extends BorderPane {
 
     private final Button returnButton = new Button("⚗ RETURN TO KINEMATICS");
     private Runnable onReturnToKinematics;
+    private Runnable onOpenInverseInvestigator;
     private VBox sidebar;
 
-    private boolean updatingSlidersFromModel = false;
+    private boolean updatingInputsFromModel = false;
 
     public RainManWorkbenchView(RainManSimulationController controller) {
         this.controller = controller;
@@ -87,7 +87,7 @@ public final class RainManWorkbenchView extends BorderPane {
         setBottom(buildTransportBar());
 
         initListeners();
-        syncSlidersToModel(controller.model());
+        syncInputsToModel(controller.model());
         updateAnalyticalDisplay();
         renderActiveState();
     }
@@ -118,6 +118,14 @@ public final class RainManWorkbenchView extends BorderPane {
 
     public void setOnReturnToKinematics(Runnable callback) {
         this.onReturnToKinematics = callback;
+    }
+
+    public void setOnOpenInverseInvestigator(Runnable callback) {
+        this.onOpenInverseInvestigator = callback;
+    }
+
+    public Button openInverseInvestigatorButton() {
+        return (Button) lookup("#openInverseInvestigatorBtn");
     }
 
     public void dispose() {
@@ -179,10 +187,11 @@ public final class RainManWorkbenchView extends BorderPane {
         sidebar.setMinWidth(345);
 
         ScrollPane sidebarScroll = new ScrollPane(sidebar);
+        sidebarScroll.getStyleClass().add("sidebar-scroll");
         sidebarScroll.setFitToWidth(true);
         sidebarScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         sidebarScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        sidebarScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent;");
+        sidebarScroll.setStyle("-fx-background-color: #f5f1e5; -fx-background: #f5f1e5; -fx-border-color: transparent;");
         sidebarScroll.setPrefWidth(385);
         sidebarScroll.setMinWidth(355);
         sidebarScroll.setMaxWidth(405);
@@ -194,8 +203,9 @@ public final class RainManWorkbenchView extends BorderPane {
     private VBox buildSidebar() {
         // 1. Scenario Presets
         Label presetTitle = new Label("JEE SCENARIO PRESETS");
+        presetTitle.getStyleClass().add("inspector-heading");
         presetTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        presetTitle.setTextFill(PhysoraTheme.MUTED);
+        presetTitle.setStyle("-fx-text-fill: #334155;");
 
         presetCombo.setId("scenarioPresetCombo");
         presetCombo.getItems().addAll(
@@ -222,7 +232,7 @@ public final class RainManWorkbenchView extends BorderPane {
             } else if (selected.contains("Backward Walking")) {
                 controller.setModel(RainManSimulationModel.presetBackwardWalking());
             }
-            syncSlidersToModel(controller.model());
+            syncInputsToModel(controller.model());
             updateAnalyticalDisplay();
             renderActiveState();
         });
@@ -230,7 +240,7 @@ public final class RainManWorkbenchView extends BorderPane {
         VBox presetBox = new VBox(4, presetTitle, presetCombo);
 
         // 2. Physical Parameters Card
-        VBox paramsCard = buildSlidersCard();
+        VBox paramsCard = buildParametersCard();
 
         // 3. Umbrella Angle Control Card
         VBox umbrellaCard = buildUmbrellaCard();
@@ -244,41 +254,22 @@ public final class RainManWorkbenchView extends BorderPane {
         return new VBox(8, presetBox, paramsCard, umbrellaCard, velocityPane, inspectorBox, learningCard);
     }
 
-    private VBox buildSlidersCard() {
+    private VBox buildParametersCard() {
         Label title = new Label("PHYSICAL SCENARIO PARAMETERS");
+        title.getStyleClass().add("inspector-heading");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        title.setTextFill(PhysoraTheme.MUTED);
+        title.setStyle("-fx-text-fill: #334155;");
 
-        GridPane grid = new GridPane();
-        grid.setHgap(8);
-        grid.setVgap(4);
-
-        vDownSlider.setId("vDownSlider");
-        vRainXSlider.setId("vRainXSlider");
-        vPersonSlider.setId("vPersonSlider");
-
-        addSliderRow(grid, 0, "Downward Speed (v_d):", vDownSlider, vDownLabel);
-        addSliderRow(grid, 1, "Horizontal Wind (v_rx):", vRainXSlider, vRainXLabel);
-        addSliderRow(grid, 2, "Walker Velocity (v_m):", vPersonSlider, vPersonLabel);
-
-        VBox box = new VBox(4, title, grid);
+        VBox box = new VBox(6, title, vDownRow, vRainXRow, vPersonRow);
         box.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8;");
         return box;
     }
 
     private VBox buildUmbrellaCard() {
         Label title = new Label("UMBRELLA SHAFT ORIENTATION");
+        title.getStyleClass().add("inspector-heading");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        title.setTextFill(PhysoraTheme.MUTED);
-
-        umbrellaAngleSlider.setId("umbrellaAngleSlider");
-        umbrellaAngleSlider.setMaxWidth(Double.MAX_VALUE);
-
-        GridPane grid = new GridPane();
-        grid.setHgap(8);
-        grid.setVgap(4);
-
-        addSliderRow(grid, 0, "Shaft Angle (φ):", umbrellaAngleSlider, umbrellaAngleLabel);
+        title.setStyle("-fx-text-fill: #334155;");
 
         snapOptimalBtn.setId("snapOptimalButton");
         snapOptimalBtn.setMaxWidth(Double.MAX_VALUE);
@@ -287,39 +278,21 @@ public final class RainManWorkbenchView extends BorderPane {
         snapOptimalBtn.setOnAction(e -> {
             RainManSimulationModel snapped = controller.model().snapToOptimal();
             controller.updateModelPreservingTime(snapped);
-            syncSlidersToModel(snapped);
+            syncInputsToModel(snapped);
             updateAnalyticalDisplay();
             renderActiveState();
         });
 
-        VBox box = new VBox(6, title, grid, snapOptimalBtn);
+        VBox box = new VBox(6, title, umbrellaAngleRow, snapOptimalBtn);
         box.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8;");
         return box;
     }
 
-    private void addSliderRow(GridPane grid, int row, String name, Slider slider, Label valLabel) {
-        Label nameLbl = new Label(name);
-        nameLbl.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
-        nameLbl.setTextFill(Color.web("#334155"));
-        nameLbl.setMinWidth(130);
-
-        slider.setMaxWidth(Double.MAX_VALUE);
-        GridPane.setHgrow(slider, Priority.ALWAYS);
-
-        valLabel.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
-        valLabel.setTextFill(PhysoraTheme.INK);
-        valLabel.setMinWidth(60);
-        valLabel.setAlignment(Pos.CENTER_RIGHT);
-
-        grid.add(nameLbl, 0, row);
-        grid.add(slider, 1, row);
-        grid.add(valLabel, 2, row);
-    }
-
     private VBox buildAnalyticalCard() {
         Label title = new Label("RELATIVE MOTION & ALIGNMENT INSPECTOR");
+        title.getStyleClass().add("inspector-heading");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        title.setTextFill(PhysoraTheme.MUTED);
+        title.setStyle("-fx-text-fill: #334155;");
 
         alignmentStatusBadge.setId("alignmentStatusBadge");
         alignmentStatusBadge.setMaxWidth(Double.MAX_VALUE);
@@ -339,7 +312,7 @@ public final class RainManWorkbenchView extends BorderPane {
 
         addInspectorRow(grid, 0, "Optimal Tilt (φ_opt):", valOptimalAngle);
         addInspectorRow(grid, 1, "Actual Tilt (φ_act):", valActualAngle);
-        addInspectorRow(grid, 2, "Angular Error (|Δφ|):", valAngularError);
+        addInspectorRow(grid, 2, "Angular Alignment Error (|Δφ|):", valAngularError);
         addInspectorRow(grid, 3, "Apparent Speed (|v_{r/m}|):", valApparentSpeed);
         addInspectorRow(grid, 4, "Apparent Velocity (v_{r/m}):", valApparentVelocity);
 
@@ -350,12 +323,14 @@ public final class RainManWorkbenchView extends BorderPane {
 
     private void addInspectorRow(GridPane grid, int row, String name, Label valLabel) {
         Label nameLbl = new Label(name);
+        nameLbl.getStyleClass().add("metric-name");
         nameLbl.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
-        nameLbl.setTextFill(Color.web("#475569"));
+        nameLbl.setStyle("-fx-text-fill: #1e293b; -fx-font-weight: bold;");
         nameLbl.setMinWidth(140);
 
+        valLabel.getStyleClass().add("metric-value");
         valLabel.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
-        valLabel.setTextFill(PhysoraTheme.INK);
+        valLabel.setStyle("-fx-text-fill: #0f172a;");
         valLabel.setMaxWidth(Double.MAX_VALUE);
         GridPane.setHgrow(valLabel, Priority.ALWAYS);
 
@@ -364,21 +339,30 @@ public final class RainManWorkbenchView extends BorderPane {
     }
 
     private VBox buildGuidedLearningCard() {
-        Label title = new Label("GUIDED LEARNING INSIGHT");
+        Label title = new Label("💡 GUIDED LEARNING & VALUE INTERPRETATION");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        title.setTextFill(PhysoraTheme.MUTED);
+        title.setStyle("-fx-text-fill: #1e293b;");
 
         Label concept = new Label(
-                "• Why tilt forward? In the walker frame, rain appears to slant backwards due to -v_m.\n" +
-                "• Optimal shaft orientation: The umbrella shaft points directly opposite to apparent rain: " +
-                "u_incoming = -v_{r/m} = (v_m - v_rx, v_d).\n" +
-                "• Angle formula: tan(φ) = (v_m - v_rx) / v_d from upward vertical."
+                "• Why does rain appear slanted? In the walker frame, the ground rushes backward at -v_m, adding a relative horizontal wind.\n" +
+                "• Why tilt forward? Incoming apparent rain approaches along v_{r/m}. The umbrella shaft must point in the exact opposite direction: u_incoming = -v_{r/m} = (v_m - v_rx, v_d).\n" +
+                "• Optimal tilt angle formula: tan(φ_opt) = (v_m - v_rx) / v_d from upward vertical.\n" +
+                "• Alignment rule: When actual tilt φ_act matches φ_opt (Error ≤ 1.0°), the umbrella shaft aligns parallel to the incoming apparent rain direction (-v_r/m). This models geometric orientation, not droplet interception or personal waterproofing."
         );
-        concept.setStyle("-fx-font-size: 11px; -fx-text-fill: #334155; -fx-line-spacing: 2px;");
+        concept.setStyle("-fx-font-size: 10px; -fx-text-fill: #334155; -fx-line-spacing: 2.5px;");
         concept.setWrapText(true);
 
-        VBox box = new VBox(4, title, concept);
-        box.setStyle("-fx-background-color: #f1f5f9; -fx-border-color: #cbd5e1; -fx-border-radius: 6px; -fx-padding: 8;");
+        Button openInverseBtn = new Button("🔬 INVERSE PROBLEM: RECONSTRUCT RAIN FROM 2 OBSERVERS ▶");
+        openInverseBtn.setId("openInverseInvestigatorBtn");
+        openInverseBtn.setStyle("-fx-background-color: #2453d4; -fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 10px; -fx-padding: 5 10 5 10; -fx-border-radius: 4px;");
+        openInverseBtn.setOnAction(e -> {
+            if (onOpenInverseInvestigator != null) {
+                onOpenInverseInvestigator.run();
+            }
+        });
+
+        VBox box = new VBox(6, title, concept, openInverseBtn);
+        box.setStyle("-fx-background-color: #f8fafc; -fx-border-color: #cbd5e1; -fx-border-radius: 6px; -fx-padding: 8 10 8 10;");
         return box;
     }
 
@@ -426,12 +410,6 @@ public final class RainManWorkbenchView extends BorderPane {
     }
 
     private void initListeners() {
-        // Model slider listeners
-        vDownSlider.valueProperty().addListener((obs, oldVal, newVal) -> onParameterSliderChanged());
-        vRainXSlider.valueProperty().addListener((obs, oldVal, newVal) -> onParameterSliderChanged());
-        vPersonSlider.valueProperty().addListener((obs, oldVal, newVal) -> onParameterSliderChanged());
-        umbrellaAngleSlider.valueProperty().addListener((obs, oldVal, newVal) -> onParameterSliderChanged());
-
         // Controller simulation time listener
         controller.simulationTimeProperty().addListener((obs, oldT, newT) -> {
             double t = newT.doubleValue();
@@ -450,48 +428,38 @@ public final class RainManWorkbenchView extends BorderPane {
         // Controller model listener
         controller.modelProperty().addListener((obs, oldM, newM) -> {
             if (newM != null) {
-                syncSlidersToModel(newM);
+                syncInputsToModel(newM);
                 updateAnalyticalDisplay();
                 renderActiveState();
             }
         });
     }
 
-    private void onParameterSliderChanged() {
-        if (updatingSlidersFromModel) return;
+    private void onParameterInputChanged() {
+        if (updatingInputsFromModel) return;
 
-        double vd = vDownSlider.getValue();
-        double vrx = vRainXSlider.getValue();
-        double vm = vPersonSlider.getValue();
-        double phi = umbrellaAngleSlider.getValue();
+        double vd = vDownRow.getValue();
+        double vrx = vRainXRow.getValue();
+        double vm = vPersonRow.getValue();
+        double phi = umbrellaAngleRow.getValue();
 
         RainManSimulationModel updated = RainManSimulationModel.ofDegrees(vd, vrx, vm, phi);
         controller.updateModelPreservingTime(updated);
-
-        vDownLabel.setText(String.format(Locale.ROOT, "%.1f m/s", vd));
-        vRainXLabel.setText(String.format(Locale.ROOT, "%.1f m/s", vrx));
-        vPersonLabel.setText(String.format(Locale.ROOT, "%.1f m/s", vm));
-        umbrellaAngleLabel.setText(String.format(Locale.ROOT, "%+.1f°", phi));
 
         updateAnalyticalDisplay();
         renderActiveState();
     }
 
-    private void syncSlidersToModel(RainManSimulationModel model) {
+    private void syncInputsToModel(RainManSimulationModel model) {
         if (model == null) return;
-        updatingSlidersFromModel = true;
+        updatingInputsFromModel = true;
         try {
-            vDownSlider.setValue(model.vDown());
-            vRainXSlider.setValue(model.vRainX());
-            vPersonSlider.setValue(model.vPerson());
-            umbrellaAngleSlider.setValue(model.umbrellaAngleDeg());
-
-            vDownLabel.setText(String.format(Locale.ROOT, "%.1f m/s", model.vDown()));
-            vRainXLabel.setText(String.format(Locale.ROOT, "%.1f m/s", model.vRainX()));
-            vPersonLabel.setText(String.format(Locale.ROOT, "%.1f m/s", model.vPerson()));
-            umbrellaAngleLabel.setText(String.format(Locale.ROOT, "%+.1f°", model.umbrellaAngleDeg()));
+            vDownRow.setValue(model.vDown());
+            vRainXRow.setValue(model.vRainX());
+            vPersonRow.setValue(model.vPerson());
+            umbrellaAngleRow.setValue(model.umbrellaAngleDeg());
         } finally {
-            updatingSlidersFromModel = false;
+            updatingInputsFromModel = false;
         }
     }
 
@@ -501,7 +469,7 @@ public final class RainManWorkbenchView extends BorderPane {
 
         // Alignment Status Badge
         RainManSimulationModel.AlignmentStatus status = m.alignmentStatus();
-        alignmentStatusBadge.setText("● " + status.label().toUpperCase(Locale.ROOT));
+        alignmentStatusBadge.setText("● Alignment Rating: " + status.label().toUpperCase(Locale.ROOT));
         alignmentStatusBadge.setStyle(String.format(
                 "-fx-background-color: %s; -fx-text-fill: %s; -fx-font-family: 'Segoe UI'; " +
                 "-fx-font-size: 11px; -fx-font-weight: bold; -fx-border-color: %s; " +
@@ -520,7 +488,7 @@ public final class RainManWorkbenchView extends BorderPane {
         valApparentSpeed.setText(String.format(Locale.ROOT, "%.2f m/s", m.apparentRainSpeed()));
 
         Vector2D vrm = m.apparentRainVelocity();
-        valApparentVelocity.setText(String.format(Locale.ROOT, "(%.1f, %.1f) m/s", vrm.x(), vrm.y()));
+        valApparentVelocity.setText(String.format(Locale.ROOT, "(%+.1f, %+.1f) m/s", vrm.x(), vrm.y()));
 
         // Velocity triangle update
         velocityPane.update(m);
@@ -528,5 +496,41 @@ public final class RainManWorkbenchView extends BorderPane {
 
     private void renderActiveState() {
         canvasRenderer.render(controller.model(), controller.simulationTime());
+    }
+
+    public ComboBox<String> presetCombo() {
+        return presetCombo;
+    }
+
+    public TextField vDownInput() {
+        return vDownRow.valueField();
+    }
+
+    public TextField vRainXInput() {
+        return vRainXRow.valueField();
+    }
+
+    public TextField vPersonInput() {
+        return vPersonRow.valueField();
+    }
+
+    public TextField umbrellaAngleInput() {
+        return umbrellaAngleRow.valueField();
+    }
+
+    public NumericParameterRow vDownRow() {
+        return vDownRow;
+    }
+
+    public NumericParameterRow vRainXRow() {
+        return vRainXRow;
+    }
+
+    public NumericParameterRow vPersonRow() {
+        return vPersonRow;
+    }
+
+    public NumericParameterRow umbrellaAngleRow() {
+        return umbrellaAngleRow;
     }
 }

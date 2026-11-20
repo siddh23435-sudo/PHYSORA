@@ -46,7 +46,7 @@ public final class RiverBoatVelocityPane extends BorderPane {
         canvas.setHeight(height);
     }
 
-    // Formatted readouts: Vector name, components, magnitude, and status badge
+    // Formatted readouts: Vector name, frame, components, magnitude, and status badge
     private final Label valVRelComponents = new Label();
     private final Label valVRelMagnitude = new Label();
     private final Label valVRelBadge = new Label();
@@ -59,21 +59,24 @@ public final class RiverBoatVelocityPane extends BorderPane {
     private final Label valVGroundMagnitude = new Label();
     private final Label valVGroundBadge = new Label();
 
-    private final Label insightCard = new Label();
+    private final Label insightTitle = new Label("💡 WHAT DO THESE VALUES SHOW?");
+    private final Label insightBody = new Label();
+    private final VBox insightCard = new VBox(4, insightTitle, insightBody);
 
     public RiverBoatVelocityPane() {
         setId("riverBoatVelocityPane");
         setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-background-radius: 6px;");
-        setPadding(new Insets(12, 14, 12, 14));
+        setPadding(new Insets(10, 10, 10, 10));
 
         // 1. Header with Formula
         Label title = new Label("DYNAMIC VELOCITY TRIANGLE");
+        title.getStyleClass().add("inspector-heading");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.5));
-        title.setTextFill(PhysoraTheme.INK);
+        title.setStyle("-fx-text-fill: #142e4b;");
 
-        Label formula = new Label("v_b/g = v_b/r + u");
-        formula.setFont(Font.font("Consolas", FontWeight.BOLD, 12.0));
-        formula.setStyle("-fx-background-color: #e2e8f0; -fx-padding: 3 8 3 8; -fx-background-radius: 4px; -fx-text-fill: #0f172a;");
+        Label formula = new Label("v⃗_b/g = v⃗_b/r + u⃗");
+        formula.setFont(Font.font("Consolas", FontWeight.BOLD, 11.5));
+        formula.setStyle("-fx-background-color: #e2e8f0; -fx-padding: 2 6 2 6; -fx-background-radius: 4px; -fx-text-fill: #0f172a;");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -103,51 +106,129 @@ public final class RiverBoatVelocityPane extends BorderPane {
         Vector2D vGround = model.velocityBoatGround();
         RiverBoatResult result = model.analyticalResult();
 
+        double vxClean = Math.abs(vGround.x()) < 1e-6 ? 0.0 : vGround.x();
+        double courseDeg = Math.toDegrees(Math.atan2(vxClean, Math.max(1e-6, vGround.y())));
+
         // 1. Update text readouts
-        valVRelComponents.setText(String.format(Locale.US, "(%.1f, %.1f)", vRel.x(), vRel.y()));
+        valVRelComponents.setText(String.format(Locale.US, "(%+.1f, %+.1f)", vRel.x(), vRel.y()));
         valVRelMagnitude.setText(String.format(Locale.US, "%.1f m/s", model.boatSpeed()));
-        valVRelBadge.setText(String.format(Locale.US, "θ=%.1f°", model.headingAngleDeg()));
+        valVRelBadge.setText(String.format(Locale.US, "Heading θ=%.1f° upstream", model.headingAngleDeg()));
 
-        valUComponents.setText(String.format(Locale.US, "(%.1f, 0.0)", u.x()));
+        valUComponents.setText(String.format(Locale.US, "(%+.1f, 0.0)", u.x()));
         valUMagnitude.setText(String.format(Locale.US, "%.1f m/s", model.riverSpeed()));
-        valUBadge.setText("current");
+        valUBadge.setText("Current downstream (+x)");
 
-        valVGroundComponents.setText(String.format(Locale.US, "(%.1f, %.1f)", vGround.x(), vGround.y()));
+        valVGroundComponents.setText(String.format(Locale.US, "(%+.1f, %+.1f)", vxClean, vGround.y()));
         valVGroundMagnitude.setText(String.format(Locale.US, "%.1f m/s", vGround.magnitude()));
-        valVGroundBadge.setText("ground");
+        if (Math.abs(courseDeg) < 0.05) {
+            valVGroundBadge.setText("Course α=0.0° (Direct Across)");
+        } else {
+            valVGroundBadge.setText(String.format(Locale.US, "Course α=%+.1f° from normal", courseDeg));
+        }
 
         // 2. Update educational insight card
-        updateInsightCard(result, model);
+        updateInsightCard(result, model, vRel, u, vGround, vxClean, courseDeg);
 
         // 3. Redraw vector triangle canvas
         renderTriangleCanvas(vRel, u, vGround);
     }
 
-    private void updateInsightCard(RiverBoatResult result, RiverBoatSimulationModel model) {
+    private void updateInsightCard(RiverBoatResult result, RiverBoatSimulationModel model,
+                                   Vector2D vRel, Vector2D u, Vector2D vGround, double vxClean, double courseDeg) {
         RiverBoatCrossingType type = result.crossingType();
+        StringBuilder sb = new StringBuilder();
+
+        // Step 1: Given Parameters & Water Heading Decomposition
+        sb.append(String.format(Locale.US,
+                "1. STEERING THROUGH WATER (Moving Medium Frame S_w):\n" +
+                "   • Engine speed vb = %.1f m/s steered at θ = %.1f° upstream.\n" +
+                "   • Upstream component (opposing flow): vx_rel = -vb·sin(θ) = -%.1f·sin(%.1f°) = %+.2f m/s.\n" +
+                "   • Across-bank component (crossing flow): vy = +vb·cos(θ) = +%.1f·cos(%.1f°) = %+.2f m/s.\n\n",
+                model.boatSpeed(), model.headingAngleDeg(), model.boatSpeed(), model.headingAngleDeg(), vRel.x(),
+                model.boatSpeed(), model.headingAngleDeg(), vRel.y()));
+
+        // Step 2: River Current & Ground Velocity Composition
+        sb.append(String.format(Locale.US,
+                "2. GROUND VELOCITY COMPOSITION (Laboratory Frame S):\n" +
+                "   • Vector sum: v_ground = v_{b/r} + u\n" +
+                "   • Net horizontal drift speed: vx = vx_rel + u = (%+.2f) + (+%.2f) = %+.2f m/s.\n" +
+                "   • Net across-bank speed: vy = +%.2f m/s (River current has u_y = 0; river flow never affects vy).\n" +
+                "   • Resultant ground course: α = %+.1f° from perpendicular normal | Ground speed: %.2f m/s.\n\n",
+                vRel.x(), u.x(), vxClean, vGround.y(), courseDeg, vGround.magnitude()));
+
+        // Step 3: Crossing Duration & Total Drift
+        if (result.crossingTime().isPresent()) {
+            sb.append(String.format(Locale.US,
+                    "3. CROSSING TIME & DOWNSTREAM DRIFT:\n" +
+                    "   • Crossing time is governed strictly by across-bank velocity vy: t = w / vy = %.1f m / %.2f m/s = %.2f s.\n" +
+                    "   • Total drift along opposite bank: x = vx · t = (%+.2f m/s) · %.2f s = %+.2f m (%s).\n\n",
+                    model.riverWidth(), vGround.y(), result.crossingTime().getAsDouble(),
+                    vxClean, result.crossingTime().getAsDouble(), result.downstreamDrift().orElse(0.0),
+                    Math.abs(result.downstreamDrift().orElse(0.0)) < 1e-4 ? "Direct landing opposite dock" : "drifted downstream"));
+        } else {
+            sb.append(
+                    "3. CROSSING TIME & DOWNSTREAM DRIFT:\n" +
+                    "   • Across-bank velocity vy = 0.00 m/s ⟹ Boat hovers indefinitely and never reaches the opposite bank (t → ∞).\n\n");
+        }
+
+        // Step 4: JEE Scenario Interpretation
+        sb.append("4. JEE EXAM STRATEGY & CLASSIFICATION:\n");
         switch (type) {
-            case SHORTEST_TIME -> {
-                insightCard.setText("SHORTEST TIME (θ = 0°): Directing the boat perpendicular to the current maximizes across-bank velocity vy = vb. The river current does not delay crossing time: t_min = w / vb.");
-                insightCard.setStyle("-fx-background-color: #ecfdf5; -fx-text-fill: #065f46; -fx-font-size: 11px; -fx-padding: 8 10 8 10; -fx-border-color: #a7f3d0; -fx-border-radius: 4px; -fx-background-radius: 4px;");
-            }
             case ZERO_DRIFT_ACHIEVABLE -> {
-                insightCard.setText("ZERO DRIFT (vb > u): Steering upstream at sin(θ) = u/vb cancels downstream current completely (vx = 0). The boat traverses directly across the bank along the normal.");
-                insightCard.setStyle("-fx-background-color: #eff6ff; -fx-text-fill: #1e40af; -fx-font-size: 11px; -fx-padding: 8 10 8 10; -fx-border-color: #bfdbfe; -fx-border-radius: 4px; -fx-background-radius: 4px;");
+                insightTitle.setText("💡 WHAT DO THESE VALUES SHOW? [ZERO DRIFT / SHORTEST PATH]");
+                sb.append(String.format(Locale.US,
+                        "   • Shortest Path Condition (vb > u): Boat speed through water (%.1f m/s) exceeds current (%.1f m/s).\n" +
+                        "   • Exact upstream steering angle: sin(θ) = u / vb = %.1f / %.1f = %.3f ⟹ θ = %.1f°.\n" +
+                        "   • Drift cancels completely (vx = 0.00 m/s); boat travels perpendicular to the banks along the shortest path.",
+                        model.boatSpeed(), model.riverSpeed(), model.riverSpeed(), model.boatSpeed(),
+                        model.riverSpeed() / model.boatSpeed(), model.headingAngleDeg()));
+                insightCard.setStyle("-fx-background-color: #ffffff; -fx-padding: 10 12 10 12; -fx-border-color: #cbd5e1; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+                insightTitle.setStyle("-fx-text-fill: #1e40af; -fx-font-size: 11px; -fx-font-weight: bold;");
+            }
+            case SHORTEST_TIME -> {
+                insightTitle.setText("💡 WHAT DO THESE VALUES SHOW? [SHORTEST TIME CROSSING]");
+                sb.append(String.format(Locale.US,
+                        "   • Minimum Time Condition (θ = 0°): Boat steers straight across perpendicular to the bank.\n" +
+                        "   • Maximizes across-bank velocity: vy = vb = %.1f m/s ⟹ t_min = w / vb = %.1f / %.1f = %.2f s.\n" +
+                        "   • Downstream drift occurs inevitably: x = u · t_min = %.1f · %.2f = %.1f m downstream.",
+                        model.boatSpeed(), model.riverWidth(), model.boatSpeed(), result.crossingTime().orElse(0.0),
+                        model.riverSpeed(), result.crossingTime().orElse(0.0), result.downstreamDrift().orElse(0.0)));
+                insightCard.setStyle("-fx-background-color: #ffffff; -fx-padding: 10 12 10 12; -fx-border-color: #cbd5e1; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+                insightTitle.setStyle("-fx-text-fill: #065f46; -fx-font-size: 11px; -fx-font-weight: bold;");
             }
             case ZERO_DRIFT_UNACHIEVABLE -> {
-                insightCard.setText("MINIMUM DRIFT (vb < u): Current exceeds boat speed, so zero drift is physically impossible. Drift is minimized when sin(θ) = vb/u, making ground velocity tangent to the velocity circle.");
-                insightCard.setStyle("-fx-background-color: #fef2f2; -fx-text-fill: #991b1b; -fx-font-size: 11px; -fx-padding: 8 10 8 10; -fx-border-color: #fecaca; -fx-border-radius: 4px; -fx-background-radius: 4px;");
+                insightTitle.setText("💡 WHAT DO THESE VALUES SHOW? [MINIMUM DRIFT (vb < u)]");
+                sb.append(String.format(Locale.US,
+                        "   • Current Exceeds Boat Speed (u = %.1f m/s > vb = %.1f m/s): Zero drift is physically impossible.\n" +
+                        "   • Minimum Drift Strategy: Steer at sin(θ) = vb / u = %.1f / %.1f = %.3f ⟹ θ = %.1f° upstream.\n" +
+                        "   • Ground velocity vector becomes tangent to the velocity circle, minimizing downstream drift to x_min = %.2f m.",
+                        model.riverSpeed(), model.boatSpeed(), model.boatSpeed(), model.riverSpeed(),
+                        model.boatSpeed() / model.riverSpeed(), model.headingAngleDeg(), result.downstreamDrift().orElse(0.0)));
+                insightCard.setStyle("-fx-background-color: #ffffff; -fx-padding: 10 12 10 12; -fx-border-color: #cbd5e1; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+                insightTitle.setStyle("-fx-text-fill: #991b1b; -fx-font-size: 11px; -fx-font-weight: bold;");
             }
             case ZERO_DRIFT_ONLY_ASYMPTOTIC -> {
-                insightCard.setText("ASYMPTOTIC BOUNDARY (vb = u): Holding directly upstream (θ = 90°) cancels current entirely (v_net = 0). The boat remains stationary and zero drift is never reached in finite time (t → ∞).");
-                insightCard.setStyle("-fx-background-color: #fefce8; -fx-text-fill: #854d0e; -fx-font-size: 11px; -fx-padding: 8 10 8 10; -fx-border-color: #fef08a; -fx-border-radius: 4px; -fx-background-radius: 4px;");
+                insightTitle.setText("💡 WHAT DO THESE VALUES SHOW? [ASYMPTOTIC LIMIT (vb = u)]");
+                sb.append(
+                        "   • Equal Speed Boundary (vb = u, θ = 90°): Steering directly upstream cancels river flow completely (vx = 0),\n" +
+                        "     but leaves zero across-bank velocity (vy = 0). The boat hovers indefinitely relative to the ground.");
+                insightCard.setStyle("-fx-background-color: #ffffff; -fx-padding: 10 12 10 12; -fx-border-color: #cbd5e1; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+                insightTitle.setStyle("-fx-text-fill: #854d0e; -fx-font-size: 11px; -fx-font-weight: bold;");
             }
             default -> {
-                insightCard.setText(String.format(Locale.US, "GENERAL CROSSING: Ground velocity is the vector sum v_ground = v_{b/r} + u. Crossing duration is t = w / (vb cos θ) = %.2f s.",
-                        result.crossingTime().orElse(0.0)));
-                insightCard.setStyle("-fx-background-color: #f8fafc; -fx-text-fill: #334155; -fx-font-size: 11px; -fx-padding: 8 10 8 10; -fx-border-color: #e2e8f0; -fx-border-radius: 4px; -fx-background-radius: 4px;");
+                insightTitle.setText("💡 WHAT DO THESE VALUES SHOW? [GENERAL CROSSING]");
+                sb.append(String.format(Locale.US,
+                        "   • Resultant Ground Motion: Steering θ = %.1f° through water produces ground course α = %+.1f°,\n" +
+                        "     landing at opposite bank with drift x = %.2f m in t = %.2f s.",
+                        model.headingAngleDeg(), courseDeg, result.downstreamDrift().orElse(0.0), result.crossingTime().orElse(0.0)));
+                insightCard.setStyle("-fx-background-color: #ffffff; -fx-padding: 10 12 10 12; -fx-border-color: #cbd5e1; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+                insightTitle.setStyle("-fx-text-fill: #1e293b; -fx-font-size: 11px; -fx-font-weight: bold;");
             }
         }
+
+        insightBody.setText(sb.toString());
+        insightBody.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 10px; -fx-text-fill: #1e293b; -fx-line-spacing: 2.2px;");
+        insightBody.setWrapText(true);
     }
 
     private void renderTriangleCanvas(Vector2D vRel, Vector2D u, Vector2D vGround) {
@@ -238,64 +319,86 @@ public final class RiverBoatVelocityPane extends BorderPane {
 
     private VBox buildBottomArea() {
         GridPane table = new GridPane();
-        table.setHgap(6);
-        table.setVgap(3);
+        table.setHgap(8);
+        table.setVgap(4);
         table.setPadding(new Insets(4, 2, 4, 2));
 
-        table.add(createHeaderLabel("VECTOR"), 0, 0);
-        table.add(createHeaderLabel("(vx, vy)"), 1, 0);
-        table.add(createHeaderLabel("SPEED & ROLE"), 2, 0);
+        table.add(createHeaderLabel("QUANTITY"), 0, 0);
+        table.add(createHeaderLabel("FRAME"), 1, 0);
+        table.add(createHeaderLabel("COMPONENTS (vx, vy)"), 2, 0);
+        table.add(createHeaderLabel("SPEED & COURSE / ROLE"), 3, 0);
 
         // Row 1: v_{b/r}
         table.add(createVectorBadge("v_b/r", COLOR_V_REL), 0, 1);
-        table.add(valVRelComponents, 1, 1);
-        HBox row1Box = new HBox(4, valVRelMagnitude, valVRelBadge);
+        Label frame1 = createFrameBadge("Water (S_w)");
+        table.add(frame1, 1, 1);
+        table.add(valVRelComponents, 2, 1);
+        HBox row1Box = new HBox(6, valVRelMagnitude, valVRelBadge);
         row1Box.setAlignment(Pos.CENTER_LEFT);
-        table.add(row1Box, 2, 1);
+        table.add(row1Box, 3, 1);
 
         // Row 2: u
         table.add(createVectorBadge("u", COLOR_U), 0, 2);
-        table.add(valUComponents, 1, 2);
-        HBox row2Box = new HBox(4, valUMagnitude, valUBadge);
+        Label frame2 = createFrameBadge("Ground (S)");
+        table.add(frame2, 1, 2);
+        table.add(valUComponents, 2, 2);
+        HBox row2Box = new HBox(6, valUMagnitude, valUBadge);
         row2Box.setAlignment(Pos.CENTER_LEFT);
-        table.add(row2Box, 2, 2);
+        table.add(row2Box, 3, 2);
 
         // Row 3: v_{b/g}
         table.add(createVectorBadge("v_b/g", COLOR_V_GROUND), 0, 3);
-        table.add(valVGroundComponents, 1, 3);
-        HBox row3Box = new HBox(4, valVGroundMagnitude, valVGroundBadge);
+        Label frame3 = createFrameBadge("Ground (S)");
+        table.add(frame3, 1, 3);
+        table.add(valVGroundComponents, 2, 3);
+        HBox row3Box = new HBox(6, valVGroundMagnitude, valVGroundBadge);
         row3Box.setAlignment(Pos.CENTER_LEFT);
-        table.add(row3Box, 2, 3);
+        table.add(row3Box, 3, 3);
 
         styleRow(valVRelComponents, valVRelMagnitude, valVRelBadge);
         styleRow(valUComponents, valUMagnitude, valUBadge);
         styleRow(valVGroundComponents, valVGroundMagnitude, valVGroundBadge);
 
-        insightCard.setWrapText(true);
+        // Convention banner
+        Label conventionLabel = new Label("📐 CONVENTIONS: +x = downstream current | +y = across river to north bank | θ = steering angle upstream from normal");
+        conventionLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        conventionLabel.setStyle("-fx-text-fill: #475569; -fx-background-color: #f1f5f9; -fx-padding: 3 6 3 6; -fx-border-color: #cbd5e1; -fx-border-radius: 4px;");
 
-        return new VBox(6, table, insightCard);
+        return new VBox(6, table, conventionLabel, insightCard);
     }
 
     private Label createHeaderLabel(String text) {
         Label lbl = new Label(text);
+        lbl.getStyleClass().add("metric-name");
         lbl.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
-        lbl.setTextFill(PhysoraTheme.MUTED);
+        lbl.setStyle("-fx-text-fill: #475569;");
         return lbl;
+    }
+
+    private Label createFrameBadge(String text) {
+        Label badge = new Label(text);
+        badge.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        badge.setStyle("-fx-text-fill: #64748b; -fx-background-color: #e2e8f0; -fx-padding: 1 5 1 5; -fx-background-radius: 3px;");
+        return badge;
     }
 
     private Label createVectorBadge(String text, Color color) {
         Label badge = new Label(text);
         badge.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
         String hex = String.format("#%02x%02x%02x", (int) (color.getRed() * 255), (int) (color.getGreen() * 255), (int) (color.getBlue() * 255));
-        badge.setStyle(String.format("-fx-background-color: %s20; -fx-text-fill: %s; -fx-padding: 2 6 2 6; -fx-background-radius: 3px;", hex, hex));
+        badge.setStyle(String.format("-fx-background-color: %s25; -fx-text-fill: %s; -fx-padding: 2 6 2 6; -fx-background-radius: 3px; -fx-border-color: %s50; -fx-border-radius: 3px;", hex, hex, hex));
         return badge;
     }
 
     private void styleRow(Label comp, Label mag, Label badge) {
+        comp.getStyleClass().add("metric-value");
         comp.setFont(Font.font("Consolas", FontWeight.NORMAL, 10.5));
-        comp.setTextFill(PhysoraTheme.INK);
+        comp.setStyle("-fx-text-fill: #0f172a;");
+
+        mag.getStyleClass().add("metric-value");
         mag.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
-        mag.setTextFill(PhysoraTheme.INK);
-        badge.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 10px; -fx-text-fill: #64748b;");
+        mag.setStyle("-fx-text-fill: #0f172a;");
+
+        badge.setStyle("-fx-font-family: 'Segoe UI'; -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #475569;");
     }
 }

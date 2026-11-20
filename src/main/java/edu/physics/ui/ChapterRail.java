@@ -50,7 +50,7 @@ final class ChapterRail extends BorderPane {
         getStyleClass().add("chapter-rail");
         setPrefWidth(EXPANDED_WIDTH);
         setMinWidth(COLLAPSED_WIDTH);
-        setStyle("-fx-background-color: #132b45;");
+        setStyle("-fx-background-color: #112338;");
 
         collapseToggle.setId("railCollapseToggle");
         collapseToggle.getStyleClass().add("rail-toggle-button");
@@ -59,6 +59,8 @@ final class ChapterRail extends BorderPane {
         scrollPane.setFitToWidth(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.getStyleClass().add("chapter-scroll");
+        scrollPane.setStyle("-fx-background-color: #112338; -fx-background: #112338; -fx-border-color: transparent;");
+        chapterListBox.setStyle("-fx-background-color: #112338;");
 
         footnote.setId("railFootnote");
         footnote.getStyleClass().add("rail-footnote");
@@ -152,7 +154,7 @@ final class ChapterRail extends BorderPane {
                 chapterListBox.getChildren().add(row);
             }
 
-            footnote.setText("01 / LIVE BENCH\nKinematics is interactive.\n7 chapters planned.");
+            footnote.setText("01–02 / LIVE BENCH\nKinematics & Relative Motion interactive.\n6 chapters planned.");
             footnote.setPadding(new Insets(10, 0, 0, 0));
             footnote.setVisible(true);
             footnote.setManaged(true);

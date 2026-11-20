@@ -77,8 +77,16 @@ class StudentExperienceAndNavigationTest {
         assertEquals(ChapterStatus.AVAILABLE, ch1.status());
         assertTrue(ch1.isAvailable());
 
-        // Chapters 2 through 8: PLANNED
-        for (int i = 1; i < 8; i++) {
+        // Chapter 2: Relative Motion is now LIVE
+        ChapterCapability ch2 = chapters.get(1);
+        assertEquals(2, ch2.number());
+        assertEquals("relative-motion", ch2.id());
+        assertEquals("Relative Motion", ch2.title());
+        assertEquals(ChapterStatus.AVAILABLE, ch2.status(), "Chapter 2 must be marked AVAILABLE (LIVE)");
+        assertTrue(ch2.isAvailable());
+
+        // Chapters 3 through 8: PLANNED
+        for (int i = 2; i < 8; i++) {
             ChapterCapability cap = chapters.get(i);
             assertEquals(i + 1, cap.number());
             assertEquals(ChapterStatus.PLANNED, cap.status(),

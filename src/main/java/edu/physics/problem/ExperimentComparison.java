@@ -39,24 +39,24 @@ public final class ExperimentComparison {
         List<MetricRow> rows = new ArrayList<>();
 
         // 1. Initial Parameters
-        rows.add(compareDoubles("Launch Speed (v0)", "m/s", a.initialSpeed(), b.initialSpeed(),
+        rows.add(compareDoubles("Launch Speed (v₀)", "m/s", a.initialSpeed(), b.initialSpeed(),
                 "Higher launch speed provides greater kinetic energy, increasing range and height."));
         rows.add(compareDoubles("Launch Angle (θ)", "°", a.launchAngleDegrees(), b.launchAngleDegrees(),
                 "Steeper angles favor vertical climb over horizontal velocity."));
         rows.add(compareDoubles("Gravity (g)", "m/s²", a.gravity(), b.gravity(),
                 "Weaker gravity prolongs airborne duration and magnifies reach."));
-        rows.add(compareDoubles("Launch Elevation (y0)", "m", a.initialY(), b.initialY(),
+        rows.add(compareDoubles("Launch Elevation (y₀)", "m", a.initialY(), b.initialY(),
                 "Higher platforms extend the post-apex descent duration."));
         rows.add(compareDoubles("Landing Surface (y_land)", "m", a.landingY(), b.landingY(),
                 "Lower landing planes allow longer vertical fall and increased range."));
 
         // 2. Calculated Outcomes
         rows.add(compareOptional("Maximum Height (H_max)", "m", a.maximumHeight(), b.maximumHeight(),
-                "H_max = y0 + vy0² / (2g); scales quadratically with initial vertical velocity."));
+                "H_max = y₀ + vᵧ₀² / (2g); scales quadratically with initial vertical velocity."));
         rows.add(compareOptional("Flight Time (T)", "s", a.timeOfFlight(), b.timeOfFlight(),
                 "Determined by vertical launch speed, gravity, and net vertical drop."));
         rows.add(compareOptional("Horizontal Range (R)", "m", a.horizontalRange(), b.horizontalRange(),
-                "R = vx0 · T; product of invariant horizontal speed and airborne duration."));
+                "R = vₓ₀ · T; product of invariant horizontal speed and airborne duration."));
 
         // 3. High-level Physics Summary Insight
         String summaryInsight = buildSummaryInsight(a, b);

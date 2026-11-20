@@ -11,6 +11,7 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -44,18 +45,15 @@ public final class RiverBoatWorkbenchView extends BorderPane {
     private final Slider timeSlider = new Slider();
     private final Label timeReadout = new Label("t = 0.00 s / 25.00 s");
 
-    // Parameter Sliders & Readouts
-    private final Slider widthSlider = new Slider(40.0, 400.0, 100.0);
-    private final Label widthLabel = new Label("100 m");
-
-    private final Slider riverSpeedSlider = new Slider(0.0, 10.0, 3.0);
-    private final Label riverSpeedLabel = new Label("3.0 m/s");
-
-    private final Slider boatSpeedSlider = new Slider(1.0, 12.0, 5.0);
-    private final Label boatSpeedLabel = new Label("5.0 m/s");
-
-    private final Slider headingSlider = new Slider(-80.0, 80.0, 36.87);
-    private final Label headingLabel = new Label("36.9°");
+    // Physical Scenario Numeric Parameter Inputs (Standardized)
+    private final NumericParameterRow widthRow = new NumericParameterRow(
+            "River Width (w):", "m", "riverWidthInput", 100.0, 20.0, 500.0, "%.0f", v -> onParameterInputChanged());
+    private final NumericParameterRow riverSpeedRow = new NumericParameterRow(
+            "River Current (u):", "m/s", "riverSpeedInput", 3.0, 0.0, 20.0, "%.1f", v -> onParameterInputChanged());
+    private final NumericParameterRow boatSpeedRow = new NumericParameterRow(
+            "Boat Speed (vb):", "m/s", "boatSpeedInput", 5.0, 0.5, 25.0, "%.1f", v -> onParameterInputChanged());
+    private final NumericParameterRow headingRow = new NumericParameterRow(
+            "Steering (θ):", "°", "headingInput", 36.9, -85.0, 85.0, "%.1f", v -> onParameterInputChanged());
 
     private final ComboBox<String> presetCombo = new ComboBox<>();
 
@@ -65,12 +63,13 @@ public final class RiverBoatWorkbenchView extends BorderPane {
     private final Label valDownstreamDrift = new Label();
     private final Label valGroundSpeed = new Label();
     private final Label valAcrossVelocity = new Label();
+    private final Label valGroundCourse = new Label();
 
     private final Button returnButton = new Button("⚗ RETURN TO KINEMATICS");
     private Runnable onReturnToKinematics;
     private VBox sidebar;
 
-    private boolean updatingSlidersFromModel = false;
+    private boolean updatingInputsFromModel = false;
 
     public RiverBoatWorkbenchView(RiverBoatSimulationController controller) {
         this.controller = controller;
@@ -84,7 +83,7 @@ public final class RiverBoatWorkbenchView extends BorderPane {
         setBottom(buildTransportBar());
 
         initListeners();
-        syncSlidersToModel(controller.model());
+        syncInputsToModel(controller.model());
         updateAnalyticalDisplay();
         renderActiveState();
     }
@@ -176,10 +175,11 @@ public final class RiverBoatWorkbenchView extends BorderPane {
         sidebar.setMinWidth(345);
 
         ScrollPane sidebarScroll = new ScrollPane(sidebar);
+        sidebarScroll.getStyleClass().add("sidebar-scroll");
         sidebarScroll.setFitToWidth(true);
         sidebarScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         sidebarScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        sidebarScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent;");
+        sidebarScroll.setStyle("-fx-background-color: #f5f1e5; -fx-background: #f5f1e5; -fx-border-color: transparent;");
         sidebarScroll.setPrefWidth(385);
         sidebarScroll.setMinWidth(355);
         sidebarScroll.setMaxWidth(405);
@@ -191,8 +191,9 @@ public final class RiverBoatWorkbenchView extends BorderPane {
     private VBox buildSidebar() {
         // 1. Scenario Preset Picker
         Label presetTitle = new Label("JEE SCENARIO PRESETS");
+        presetTitle.getStyleClass().add("inspector-heading");
         presetTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        presetTitle.setTextFill(PhysoraTheme.MUTED);
+        presetTitle.setStyle("-fx-text-fill: #334155;");
 
         presetCombo.setId("riverBoatPresetCombo");
         presetCombo.getItems().addAll(
@@ -216,14 +217,14 @@ public final class RiverBoatWorkbenchView extends BorderPane {
             } else if (selected.contains("Equal Speed")) {
                 controller.setModel(RiverBoatSimulationModel.presetEqualSpeedBoundary(100.0, 4.0));
             }
-            syncSlidersToModel(controller.model());
+            syncInputsToModel(controller.model());
             updateAnalyticalDisplay();
         });
 
         VBox presetBox = new VBox(4, presetTitle, presetCombo);
 
-        // 2. Interactive Parameter Sliders
-        VBox controlsCard = buildSlidersCard();
+        // 2. Interactive Parameter Inputs
+        VBox controlsCard = buildParametersCard();
 
         // 3. Structured Analytical Inspector Card
         VBox inspectorBox = buildAnalyticalCard();
@@ -231,48 +232,22 @@ public final class RiverBoatWorkbenchView extends BorderPane {
         return new VBox(8, presetBox, controlsCard, velocityPane, inspectorBox);
     }
 
-    private VBox buildSlidersCard() {
+    private VBox buildParametersCard() {
         Label title = new Label("PHYSICAL SCENARIO PARAMETERS");
+        title.getStyleClass().add("inspector-heading");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        title.setTextFill(PhysoraTheme.MUTED);
+        title.setStyle("-fx-text-fill: #334155;");
 
-        GridPane grid = new GridPane();
-        grid.setHgap(8);
-        grid.setVgap(4);
-
-        addSliderRow(grid, 0, "River Width (w):", widthSlider, widthLabel);
-        addSliderRow(grid, 1, "River Current (u):", riverSpeedSlider, riverSpeedLabel);
-        addSliderRow(grid, 2, "Boat Speed (vb):", boatSpeedSlider, boatSpeedLabel);
-        addSliderRow(grid, 3, "Steering (θ):", headingSlider, headingLabel);
-
-        VBox box = new VBox(4, title, grid);
+        VBox box = new VBox(6, title, widthRow, riverSpeedRow, boatSpeedRow, headingRow);
         box.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8;");
         return box;
     }
 
-    private void addSliderRow(GridPane grid, int row, String name, Slider slider, Label valLabel) {
-        Label nameLbl = new Label(name);
-        nameLbl.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
-        nameLbl.setTextFill(Color.web("#334155"));
-        nameLbl.setMinWidth(110);
-
-        slider.setMaxWidth(Double.MAX_VALUE);
-        GridPane.setHgrow(slider, Priority.ALWAYS);
-
-        valLabel.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
-        valLabel.setTextFill(Color.web("#0f172a"));
-        valLabel.setMinWidth(55);
-        valLabel.setAlignment(Pos.CENTER_RIGHT);
-
-        grid.add(nameLbl, 0, row);
-        grid.add(slider, 1, row);
-        grid.add(valLabel, 2, row);
-    }
-
     private VBox buildAnalyticalCard() {
         Label inspectorTitle = new Label("ANALYTICAL KINEMATICS AUTHORITY");
+        inspectorTitle.getStyleClass().add("inspector-heading");
         inspectorTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        inspectorTitle.setTextFill(PhysoraTheme.MUTED);
+        inspectorTitle.setStyle("-fx-text-fill: #334155;");
 
         analyticalStatusBadge.setFont(Font.font("Consolas", FontWeight.BOLD, 11.5));
         analyticalStatusBadge.setStyle("-fx-padding: 4 8 4 8; -fx-background-radius: 4px;");
@@ -286,6 +261,7 @@ public final class RiverBoatWorkbenchView extends BorderPane {
         addMetricRow(metricsGrid, 1, "Downstream Drift:", valDownstreamDrift);
         addMetricRow(metricsGrid, 2, "Ground Speed:", valGroundSpeed);
         addMetricRow(metricsGrid, 3, "Across-Bank (vy):", valAcrossVelocity);
+        addMetricRow(metricsGrid, 4, "Ground Course (α):", valGroundCourse);
 
         VBox box = new VBox(4, inspectorTitle, analyticalStatusBadge, metricsGrid);
         box.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8;");
@@ -294,12 +270,14 @@ public final class RiverBoatWorkbenchView extends BorderPane {
 
     private void addMetricRow(GridPane grid, int row, String labelText, Label valLabel) {
         Label lbl = new Label(labelText);
+        lbl.getStyleClass().add("metric-name");
         lbl.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
-        lbl.setTextFill(Color.web("#475569"));
+        lbl.setStyle("-fx-text-fill: #1e293b; -fx-font-weight: bold;");
         lbl.setMinWidth(110);
 
-        valLabel.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
-        valLabel.setTextFill(Color.web("#0f172a"));
+        valLabel.getStyleClass().add("metric-value");
+        valLabel.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
+        valLabel.setStyle("-fx-text-fill: #0f172a;");
 
         grid.add(lbl, 0, row);
         grid.add(valLabel, 1, row);
@@ -372,51 +350,34 @@ public final class RiverBoatWorkbenchView extends BorderPane {
             timeSlider.setMax(controller.maxTime());
             timeSlider.setValue(0.0);
             timeReadout.setText(String.format(Locale.US, "t = 0.00 s / %.2f s", controller.maxTime()));
+            syncInputsToModel(newModel);
             updateAnalyticalDisplay();
             renderActiveState();
         });
-
-        // Slider interaction listeners (update model when user drags)
-        widthSlider.valueProperty().addListener((obs, oldVal, newVal) -> onSliderValueChanged());
-        riverSpeedSlider.valueProperty().addListener((obs, oldVal, newVal) -> onSliderValueChanged());
-        boatSpeedSlider.valueProperty().addListener((obs, oldVal, newVal) -> onSliderValueChanged());
-        headingSlider.valueProperty().addListener((obs, oldVal, newVal) -> onSliderValueChanged());
     }
 
-    private void onSliderValueChanged() {
-        if (updatingSlidersFromModel) return;
+    private void onParameterInputChanged() {
+        if (updatingInputsFromModel) return;
 
-        double w = Math.round(widthSlider.getValue());
-        double u = Math.round(riverSpeedSlider.getValue() * 10.0) / 10.0;
-        double vb = Math.round(boatSpeedSlider.getValue() * 10.0) / 10.0;
-        double deg = Math.round(headingSlider.getValue() * 10.0) / 10.0;
-
-        widthLabel.setText(String.format(Locale.US, "%.0f m", w));
-        riverSpeedLabel.setText(String.format(Locale.US, "%.1f m/s", u));
-        boatSpeedLabel.setText(String.format(Locale.US, "%.1f m/s", vb));
-        headingLabel.setText(String.format(Locale.US, "%.1f°", deg));
+        double w = widthRow.getValue();
+        double u = riverSpeedRow.getValue();
+        double vb = boatSpeedRow.getValue();
+        double deg = headingRow.getValue();
 
         RiverBoatSimulationModel newModel = RiverBoatSimulationModel.ofDegrees(w, u, vb, deg);
         controller.setModel(newModel);
     }
 
-    private void syncSlidersToModel(RiverBoatSimulationModel model) {
+    private void syncInputsToModel(RiverBoatSimulationModel model) {
         if (model == null) return;
-        updatingSlidersFromModel = true;
+        updatingInputsFromModel = true;
         try {
-            widthSlider.setValue(model.riverWidth());
-            widthLabel.setText(String.format(Locale.US, "%.0f m", model.riverWidth()));
-
-            riverSpeedSlider.setValue(model.riverSpeed());
-            riverSpeedLabel.setText(String.format(Locale.US, "%.1f m/s", model.riverSpeed()));
-
-            boatSpeedSlider.setValue(model.boatSpeed());
-            boatSpeedLabel.setText(String.format(Locale.US, "%.1f m/s", model.boatSpeed()));
-
-            headingSlider.setValue(model.headingAngleDeg());
-            headingLabel.setText(String.format(Locale.US, "%.1f°", model.headingAngleDeg()));
+            widthRow.setValue(model.riverWidth());
+            riverSpeedRow.setValue(model.riverSpeed());
+            boatSpeedRow.setValue(model.boatSpeed());
+            headingRow.setValue(model.headingAngleDeg());
         } finally {
-            updatingSlidersFromModel = false;
+            updatingInputsFromModel = false;
         }
     }
 
@@ -451,22 +412,36 @@ public final class RiverBoatWorkbenchView extends BorderPane {
             }
         }
 
+        Vector2D vG = m.velocityBoatGround();
+
         // 2. Metrics
         if (res.crossingTime().isPresent()) {
-            valCrossingTime.setText(String.format(Locale.US, "%.2f s", res.crossingTime().getAsDouble()));
+            valCrossingTime.setText(String.format(Locale.US, "%.2f s (Governed solely by vy)", res.crossingTime().getAsDouble()));
         } else {
-            valCrossingTime.setText("∞ (never lands)");
+            valCrossingTime.setText("∞ (Cannot reach opposite bank)");
         }
 
         if (res.downstreamDrift().isPresent()) {
-            valDownstreamDrift.setText(String.format(Locale.US, "%.2f m", res.downstreamDrift().getAsDouble()));
+            double drift = res.downstreamDrift().getAsDouble();
+            if (Math.abs(drift) < 1e-4) {
+                valDownstreamDrift.setText("0.00 m (Zero Drift / Straight Across)");
+            } else {
+                valDownstreamDrift.setText(String.format(Locale.US, "%.2f m downstream", drift));
+            }
         } else {
             valDownstreamDrift.setText("Undefined");
         }
 
-        Vector2D vG = m.velocityBoatGround();
         valGroundSpeed.setText(String.format(Locale.US, "%.2f m/s", vG.magnitude()));
-        valAcrossVelocity.setText(String.format(Locale.US, "%.2f m/s", vG.y()));
+        valAcrossVelocity.setText(String.format(Locale.US, "%.2f m/s (vy = vb cos θ)", vG.y()));
+
+        double vxClean = Math.abs(vG.x()) < 1e-4 ? 0.0 : vG.x();
+        double courseDeg = Math.toDegrees(Math.atan2(vxClean, Math.max(1e-6, vG.y())));
+        if (Math.abs(courseDeg) < 0.05) {
+            valGroundCourse.setText("0.0° (Perpendicular across bank)");
+        } else {
+            valGroundCourse.setText(String.format(Locale.US, "%+.1f° from normal", courseDeg));
+        }
 
         // Update velocity triangle widget
         velocityPane.update(m);
@@ -480,7 +455,35 @@ public final class RiverBoatWorkbenchView extends BorderPane {
         return presetCombo;
     }
 
-    public Slider headingSlider() {
-        return headingSlider;
+    public TextField headingInput() {
+        return headingRow.valueField();
+    }
+
+    public TextField riverWidthInput() {
+        return widthRow.valueField();
+    }
+
+    public TextField riverSpeedInput() {
+        return riverSpeedRow.valueField();
+    }
+
+    public TextField boatSpeedInput() {
+        return boatSpeedRow.valueField();
+    }
+
+    public NumericParameterRow headingRow() {
+        return headingRow;
+    }
+
+    public NumericParameterRow widthRow() {
+        return widthRow;
+    }
+
+    public NumericParameterRow riverSpeedRow() {
+        return riverSpeedRow;
+    }
+
+    public NumericParameterRow boatSpeedRow() {
+        return boatSpeedRow;
     }
 }

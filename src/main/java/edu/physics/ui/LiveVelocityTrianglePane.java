@@ -21,17 +21,19 @@ import java.util.Locale;
 
 /**
  * Dedicated visual widget demonstrating dynamic vector addition:
+ * 
  * <pre>
  *   v_B(t) = v_A(t) + v_{B/A}
  * </pre>
+ * 
  * Visually proves that while ground velocities curve downward under gravity,
  * their vector difference v_{B/A} remains strictly constant over time.
  */
 public final class LiveVelocityTrianglePane extends BorderPane {
 
-    private static final Color COLOR_VA = Color.web("#2453d4");   // Cobalt Blue
-    private static final Color COLOR_VB = Color.web("#e56843");   // Flame Orange
-    private static final Color COLOR_VBA = Color.web("#059669");  // Emerald Green
+    private static final Color COLOR_VA = Color.web("#2453d4"); // Cobalt Blue
+    private static final Color COLOR_VB = Color.web("#e56843"); // Flame Orange
+    private static final Color COLOR_VBA = Color.web("#059669"); // Emerald Green
 
     private final Canvas canvas = new Canvas(340, 180);
 
@@ -47,17 +49,21 @@ public final class LiveVelocityTrianglePane extends BorderPane {
 
     public LiveVelocityTrianglePane() {
         setId("liveVelocityTrianglePane");
-        setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+        setStyle(
+                "-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-background-radius: 6px;");
         setPadding(new Insets(10, 10, 10, 10));
 
         // 1. Header with Formula
         Label title = new Label("DYNAMIC VELOCITY TRIANGLE");
+        title.getStyleClass().add("inspector-heading");
         title.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.0));
-        title.setTextFill(PhysoraTheme.INK);
+        title.setStyle("-fx-text-fill: #142e4b;");
 
-        Label formula = new Label("v_B(t) = v_A(t) + v_{B/A}");
-        formula.setFont(Font.font("Consolas", FontWeight.BOLD, 11.5));
-        formula.setStyle("-fx-background-color: #e2e8f0; -fx-padding: 2 6 2 6; -fx-background-radius: 4px; -fx-text-fill: #0f172a;");
+        Label formula = new Label("v⃗_B(t) = v⃗_A(t) + v⃗_B/A");
+        formula.setFont(Font.font("Consolas", FontWeight.BOLD, 11.0));
+        formula.setStyle(
+                "-fx-background-color: #e2e8f0; -fx-padding: 2 6 2 6; -fx-background-radius: 4px; -fx-text-fill: #0f172a;");
+        formula.setMinWidth(Region.USE_PREF_SIZE);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -78,7 +84,8 @@ public final class LiveVelocityTrianglePane extends BorderPane {
     }
 
     public void update(TwoProjectilePursuitModel model, double time) {
-        if (model == null) return;
+        if (model == null)
+            return;
 
         Vector2D vA = model.velocityA(time);
         Vector2D vB = model.velocityB(time);
@@ -149,13 +156,13 @@ public final class LiveVelocityTrianglePane extends BorderPane {
         double by = originScreenY - vB.y() * scale;
 
         // 1. Draw Vector v_A: O -> Point A
-        drawArrow(gc, originScreenX, originScreenY, ax, ay, COLOR_VA, "v_A(t)");
+        drawArrow(gc, originScreenX, originScreenY, ax, ay, COLOR_VA, "v_A(t) [Ground S]");
 
         // 2. Draw Vector v_{B/A}: Point A -> Point B (Head-to-tail addition!)
-        drawArrow(gc, ax, ay, bx, by, COLOR_VBA, "v_{B/A} (const)");
+        drawArrow(gc, ax, ay, bx, by, COLOR_VBA, "v_{B/A} [Observed by A]");
 
         // 3. Draw Resultant Vector v_B: O -> Point B (Closing the triangle)
-        drawArrow(gc, originScreenX, originScreenY, bx, by, COLOR_VB, "v_B(t) [resultant]");
+        drawArrow(gc, originScreenX, originScreenY, bx, by, COLOR_VB, "v_B(t) [Ground S]");
     }
 
     private void drawArrow(GraphicsContext gc, double sx, double sy, double ex, double ey, Color color, String label) {
@@ -168,87 +175,144 @@ public final class LiveVelocityTrianglePane extends BorderPane {
 
         gc.setFill(color);
         gc.fillPolygon(
-                new double[]{ex, ex - arrowHeadLen * Math.cos(angle - Math.PI / 6), ex - arrowHeadLen * Math.cos(angle + Math.PI / 6)},
-                new double[]{ey, ey - arrowHeadLen * Math.sin(angle - Math.PI / 6), ey - arrowHeadLen * Math.sin(angle + Math.PI / 6)},
-                3
-        );
+                new double[] { ex, ex - arrowHeadLen * Math.cos(angle - Math.PI / 6),
+                        ex - arrowHeadLen * Math.cos(angle + Math.PI / 6) },
+                new double[] { ey, ey - arrowHeadLen * Math.sin(angle - Math.PI / 6),
+                        ey - arrowHeadLen * Math.sin(angle + Math.PI / 6) },
+                3);
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
+        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
         gc.fillText(label, ex + 7 * Math.cos(angle), ey + 7 * Math.sin(angle));
     }
 
     private VBox buildReadoutsTable() {
         GridPane grid = new GridPane();
-        grid.setHgap(6);
-        grid.setVgap(3);
-        grid.setPadding(new Insets(3, 0, 3, 0));
+        grid.setHgap(8);
+        grid.setVgap(4);
+        grid.setPadding(new Insets(3, 0, 4, 0));
 
-        // Row 0: v_A(t)
-        Label lblA = new Label("v_A(t):");
+        // Header Row
+        Label hVector = new Label("QUANTITY");
+        hVector.getStyleClass().add("metric-name");
+        hVector.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        hVector.setStyle("-fx-text-fill: #64748b;");
+
+        Label hFrame = new Label("FRAME");
+        hFrame.getStyleClass().add("metric-frame");
+        hFrame.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        hFrame.setStyle("-fx-text-fill: #64748b;");
+
+        Label hComp = new Label("(vx, vy)");
+        hComp.getStyleClass().add("metric-name");
+        hComp.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        hComp.setStyle("-fx-text-fill: #64748b;");
+
+        Label hSpeed = new Label("SPEED & STATUS");
+        hSpeed.getStyleClass().add("metric-name");
+        hSpeed.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        hSpeed.setStyle("-fx-text-fill: #64748b;");
+
+        grid.add(hVector, 0, 0);
+        grid.add(hFrame, 1, 0);
+        grid.add(hComp, 2, 0);
+        grid.add(hSpeed, 3, 0);
+
+        // Row 1: v_A(t)
+        Label lblA = new Label("v_A(t)");
         lblA.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
-        lblA.setTextFill(COLOR_VA);
-        lblA.setMinWidth(42);
+        lblA.getStyleClass().add("vector-cobalt");
+        lblA.setStyle("-fx-text-fill: #2453d4;");
 
-        valVAComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
-        valVAComponents.setTextFill(COLOR_VA);
-        valVAComponents.setMinWidth(80);
+        Label frameA = new Label("Ground (S)");
+        frameA.getStyleClass().add("metric-frame");
+        frameA.setFont(Font.font("Segoe UI", 9.5));
+        frameA.setStyle("-fx-text-fill: #64748b;");
 
-        valVAMagnitude.setFont(Font.font("Consolas", 10.0));
-        valVAMagnitude.setTextFill(COLOR_VA);
-        valVAMagnitude.setMinWidth(60);
+        valVAComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
+        valVAComponents.getStyleClass().add("vector-cobalt");
+        valVAComponents.setStyle("-fx-text-fill: #2453d4;");
 
-        grid.add(lblA, 0, 0);
-        grid.add(valVAComponents, 1, 0);
-        grid.add(valVAMagnitude, 2, 0);
+        valVAMagnitude.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
+        valVAMagnitude.getStyleClass().add("vector-cobalt");
+        valVAMagnitude.setStyle("-fx-text-fill: #2453d4;");
 
-        // Row 1: v_B(t)
-        Label lblB = new Label("v_B(t):");
+        grid.add(lblA, 0, 1);
+        grid.add(frameA, 1, 1);
+        grid.add(valVAComponents, 2, 1);
+        grid.add(valVAMagnitude, 3, 1);
+
+        // Row 2: v_B(t)
+        Label lblB = new Label("v_B(t)");
         lblB.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
-        lblB.setTextFill(COLOR_VB);
-        lblB.setMinWidth(42);
+        lblB.getStyleClass().add("vector-orange");
+        lblB.setStyle("-fx-text-fill: #c2410c;");
 
-        valVBComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
-        valVBComponents.setTextFill(COLOR_VB);
-        valVBComponents.setMinWidth(80);
+        Label frameB = new Label("Ground (S)");
+        frameB.getStyleClass().add("metric-frame");
+        frameB.setFont(Font.font("Segoe UI", 9.5));
+        frameB.setStyle("-fx-text-fill: #64748b;");
 
-        valVBMagnitude.setFont(Font.font("Consolas", 10.0));
-        valVBMagnitude.setTextFill(COLOR_VB);
-        valVBMagnitude.setMinWidth(60);
+        valVBComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
+        valVBComponents.getStyleClass().add("vector-orange");
+        valVBComponents.setStyle("-fx-text-fill: #c2410c;");
 
-        grid.add(lblB, 0, 1);
-        grid.add(valVBComponents, 1, 1);
-        grid.add(valVBMagnitude, 2, 1);
+        valVBMagnitude.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
+        valVBMagnitude.getStyleClass().add("vector-orange");
+        valVBMagnitude.setStyle("-fx-text-fill: #c2410c;");
 
-        // Row 2: v_{B/A}
-        Label lblBA = new Label("v_{B/A}:");
+        grid.add(lblB, 0, 2);
+        grid.add(frameB, 1, 2);
+        grid.add(valVBComponents, 2, 2);
+        grid.add(valVBMagnitude, 3, 2);
+
+        // Row 3: v_{B/A}
+        Label lblBA = new Label("v_{B/A}");
         lblBA.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
-        lblBA.setTextFill(COLOR_VBA);
-        lblBA.setMinWidth(42);
+        lblBA.getStyleClass().add("vector-emerald");
+        lblBA.setStyle("-fx-text-fill: #047857;");
 
-        valVBAComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
-        valVBAComponents.setTextFill(COLOR_VBA);
-        valVBAComponents.setMinWidth(80);
+        Label frameBA = new Label("Observer A (S_A)");
+        frameBA.getStyleClass().add("metric-frame");
+        frameBA.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        frameBA.setStyle("-fx-text-fill: #047857;");
 
-        Label constBadge = new Label("CONST (a_rel=0)");
+        valVBAComponents.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
+        valVBAComponents.getStyleClass().add("vector-emerald");
+        valVBAComponents.setStyle("-fx-text-fill: #047857;");
+
+        Label constBadge = new Label("CONSTANT");
         constBadge.setFont(Font.font("Consolas", FontWeight.BOLD, 9.0));
-        constBadge.setStyle("-fx-background-color: #d1fae5; -fx-text-fill: #065f46; -fx-padding: 1 4 1 4; -fx-background-radius: 3px;");
+        constBadge.setStyle(
+                "-fx-background-color: #d1fae5; -fx-text-fill: #065f46; -fx-padding: 1 4 1 4; -fx-background-radius: 3px; -fx-border-color: #a7f3d0; -fx-border-radius: 3px;");
 
         HBox vbaMagBox = new HBox(4, valVBAMagnitude, constBadge);
         vbaMagBox.setAlignment(Pos.CENTER_LEFT);
         valVBAMagnitude.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
-        valVBAMagnitude.setTextFill(COLOR_VBA);
+        valVBAMagnitude.getStyleClass().add("vector-emerald");
+        valVBAMagnitude.setStyle("-fx-text-fill: #047857;");
 
-        grid.add(lblBA, 0, 2);
-        grid.add(valVBAComponents, 1, 2);
-        grid.add(vbaMagBox, 2, 2);
+        grid.add(lblBA, 0, 3);
+        grid.add(frameBA, 1, 3);
+        grid.add(valVBAComponents, 2, 3);
+        grid.add(vbaMagBox, 3, 3);
 
-        // Explanatory Note below grid
-        Label note = new Label("dv_A/dt = dv_B/dt = -g j  \u27F9  d(v_{B/A})/dt = 0 (Relative velocity invariant)");
-        note.setWrapText(true);
-        note.setStyle("-fx-font-family: Consolas; -fx-font-size: 9.0px; -fx-text-fill: #334155; " +
-                "-fx-background-color: #f1f5f9; -fx-padding: 4 6 4 6; -fx-border-color: #cbd5e1; -fx-border-radius: 4px;");
+        // Explanatory Note below grid (Fictitious acceleration & Relative invariance)
+        Label noteTitle = new Label("PHYSICS INSIGHT: WHY RELATIVE VELOCITY IS INVARIANT");
+        noteTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        noteTitle.setStyle("-fx-text-fill: #1e293b;");
 
-        VBox container = new VBox(4, grid, note);
+        Label noteBody = new Label(
+                "• Gravitational Equality: Both projectiles accelerate under identical downward gravity: a_A = a_B = -g j.\n" +
+                "• Fictitious Force Balance: In Observer A's accelerating frame (S_A), a fictitious acceleration (+g j) balances gravity: a_eff = (-g j) + (+g j) = 0.\n" +
+                "• Rectilinear Invariance: Relative acceleration a_{B/A} = a_B - a_A = 0, so relative velocity v_{B/A} is strictly constant in time.");
+        noteBody.setFont(Font.font("Segoe UI", 9.5));
+        noteBody.setStyle("-fx-text-fill: #334155; -fx-line-spacing: 2px;");
+
+        VBox noteBox = new VBox(2, noteTitle, noteBody);
+        noteBox.setStyle(
+                "-fx-background-color: #f8fafc; -fx-padding: 6 8 6 8; -fx-border-color: #cbd5e1; -fx-border-radius: 4px;");
+
+        VBox container = new VBox(4, grid, noteBox);
         return container;
     }
 }

@@ -8,13 +8,28 @@ PHYSORA helps students construct physical models, understand governing equations
 
 ## Current Capabilities
 
-### Interactive Projectile Motion Normal Bench (Student-Facing)
+### Chapter 01 — Kinematics (LIVE)
 
-The desktop application presents a **Normal Bench** workspace with three tabs:
+The Kinematics laboratory provides a complete five-mode learning cycle for two-dimensional projectile motion:
 
-- **Simulation** — Animated projectile trajectory visualization with adjustable launch speed, angle, gravity, initial position, and landing height. Play/pause/reset controls, time scrubbing, playback rate, apex and landing markers, and velocity-component vectors. Physics uses positive-up Cartesian coordinates mapped to JavaFX screen-down rendering.
-- **Logic** — Structured equation derivation showing `MathExpression` trees, typed substitutions, intermediate values, and final analytical results from the deterministic `ProjectileProblemSolver`. Supports direct and inverse projectile targets, multipart dependent sequences, and candidate root reporting.
-- **AI Problem** — Submit natural-language projectile questions. An AI provider interprets the problem; PHYSORA validates the interpretation, solves it deterministically, and verifies the explanation. Attribution cards show which provider handled interpretation, explanation, and numerical verification independently. The AI never supplies accepted numerical answers.
+- **Experiment** — Interactive trajectory simulation with isotropic scaling, 1-2-5 decade grid ticks, adjustable parameters ($v_0, \theta, g, x_0, y_0, y_{\text{land}}$), velocity component overlays ($v_x, v_y$), and event markers (Apex, Landing).
+- **Predict** — Scientific hypothesis testing where predictions ($H_{\text{max}}, T, R$) are locked before launch, evaluated strictly against analytical truth upon landing, and protected against post-lock tampering.
+- **Compare** — Multi-experiment overlay comparing two trajectories on an identical physical coordinate system (e.g., $30^\circ$ vs $60^\circ$ complementary launch symmetry) with parameter delta tables and JEE insight cards.
+- **Understand** — Step-by-step 6-stage guided derivations for key quantities ($H_{\text{max}}, T, R, t_{\text{apex}}, v_{\text{land}}$) with algebraic formulas, value substitutions, and physical limit discussions.
+- **Ask AI** — Grounded problem-solving companion for natural-language projectile questions. Providers (Google Gemini or offline rule-based fallback) interpret problems and draft explanations; PHYSORA's deterministic solver computes all numerical answers.
+
+### Chapter 02 — Relative Motion (LIVE)
+
+Four dedicated interactive workbenches for two-dimensional relative kinematics:
+
+- **Two-Projectile Pursuit & Reference Frames** — Real-time simulation of two projectiles under constant gravity with dynamic Galilean transformations between Ground, Observer A, and Observer B frames, live velocity triangle ($\vec{v}_B(t) = \vec{v}_A(t) + \vec{v}_{B/A}$), and collision detection.
+- **River-Boat Vector Crossing** — Drift and heading resolution with live resultant velocity triangle ($\vec{v}_{b/g} = \vec{v}_{b/r} + \vec{u}$) and presets for Shortest Path and Quickest Crossing.
+- **Rain-Man Umbrella Alignment** — Geometric umbrella orientation modeling with real-time Angular Alignment Error ($|\Delta\phi|$) inspector, Alignment Rating badges, and snap-to-optimal tilt.
+- **Inverse Rain Investigator** — Five-stage educational workflow (Evidence $\to$ Ambiguity $\to$ Geometry $\to$ Reconstruction $\to$ Verification) for solving the inverse problem from two observer measurements, equipped with analytical conditioning diagnostics ($\kappa_{\text{down}}$).
+
+### Chapters 03–08 — Curriculum Roadmap (PLANNED)
+
+Chapters 03 through 08 (Laws of Motion, Work & Energy, Momentum & Collisions, Circular Motion, Rotation, Oscillations) are explicitly structured as planned curriculum roadmaps with comprehensive syllabus topics and seamless one-click return to active laboratories.
 
 ### AI Provider Architecture
 
@@ -104,14 +119,16 @@ PHYSORA does **not** require Ollama or a Gemini API key to launch or solve probl
 
 ## Test Baseline
 
-**367 automated tests**, all passing. Verified on `feature/physora-48hr-demo` at commit `f112909` (2026-11-15).
+**602 automated tests**, all passing (0 failures, 0 errors, 0 skipped). Verified via `.\mvnw.cmd test` on branch `chore/physora-final-cleanup`.
 
-| Phase | Scope | Approximate Tests |
-|---|---|---|
-| Phase 1 | Projectile model, problem solver, UI controls | ~76 |
-| Phase 2 | AI workflow, providers, validation, UI tab | ~124 |
-| Phase 3 | Multi-body simulation, constraints, geometry | ~127 |
-| **Total** | | **367** |
+| Scope | Approximate Tests |
+|---|---|
+| Kinematics (Models, Solvers, Predictions, Comparisons, Five Modes) | ~110 |
+| AI Workflow (Gemini, Fallback, Validation, Explanations, Repro Tests) | ~140 |
+| Relative Motion (Pursuit, River-Boat, Rain-Man, Inverse Investigator) | ~145 |
+| Multi-Body Simulation Engine (Rigid Bodies, Constraints, Cables, Delassus) | ~127 |
+| UI & Visual Lifecycle (Responsive Scaling, Screen Resolutions, Nav Audits) | ~80 |
+| **Total Passing Tests** | **602** |
 
 Note: Some tests cross-cut phase boundaries. The authoritative total is from `.\mvnw.cmd test`.
 

@@ -45,16 +45,22 @@ final class PlannedChapterView extends BorderPane {
     private final RelativeMotionWorkbenchView relativeMotionWorkbench;
     private final RiverBoatWorkbenchView riverBoatWorkbench;
     private final RainManWorkbenchView rainManWorkbench;
+    private final RainInvestigatorWorkbenchView rainInvestigatorWorkbench;
     private final BorderPane chapter2Container = new BorderPane();
     private final Button btnExpTwoProjectile = new Button("EXPERIMENT 2.1: TWO-PROJECTILE REFERENCE FRAMES");
     private final Button btnExpRiverBoat = new Button("EXPERIMENT 2.2: RIVER-BOAT VECTOR CROSSING");
     private final Button btnExpRainMan = new Button("EXPERIMENT 2.3: RAIN-MAN & UMBRELLA ORIENTATION");
+    private final Button btnExpRainInvestigator = new Button("EXPERIMENT 2.4: INVERSE RAIN INVESTIGATOR");
 
     private Runnable onReturnToKinematics;
 
     PlannedChapterView() {
         setId("plannedChapterView");
         getStyleClass().add("planned-chapter-view");
+        var stylesheet = getClass().getResource("/edu/physics/ui/physora.css");
+        if (stylesheet != null) {
+            getStylesheets().add(stylesheet.toExternalForm());
+        }
         setStyle("-fx-background-color: #f5f1e5;");
         setPadding(new Insets(10, 16, 10, 16));
 
@@ -78,14 +84,20 @@ final class PlannedChapterView extends BorderPane {
                 onReturnToKinematics.run();
             }
         });
+        this.rainManWorkbench.setOnOpenInverseInvestigator(() -> selectChapter2Experiment(4));
+
+        this.rainInvestigatorWorkbench = new RainInvestigatorWorkbenchView();
+        this.rainInvestigatorWorkbench.setOnReturnToKinematics(() -> {
+            if (onReturnToKinematics != null) {
+                onReturnToKinematics.run();
+            }
+        });
 
         returnButton.setId("returnToKinematicsButton");
         returnButton.getStyleClass().add("transport-primary");
         returnButton.setStyle("-fx-font-size: 11px; -fx-padding: 10 18 10 18;");
         returnButton.setOnAction(e -> {
-            relativeMotionWorkbench.controller().pause();
-            riverBoatWorkbench.controller().pause();
-            rainManWorkbench.controller().pause();
+            pauseAllSimulations();
             if (onReturnToKinematics != null) {
                 onReturnToKinematics.run();
             }
@@ -100,12 +112,14 @@ final class PlannedChapterView extends BorderPane {
         btnExpTwoProjectile.setId("btnExpTwoProjectile");
         btnExpRiverBoat.setId("btnExpRiverBoat");
         btnExpRainMan.setId("btnExpRainMan");
+        btnExpRainInvestigator.setId("btnExpRainInvestigator");
 
         btnExpTwoProjectile.setOnAction(e -> selectChapter2Experiment(1));
         btnExpRiverBoat.setOnAction(e -> selectChapter2Experiment(2));
         btnExpRainMan.setOnAction(e -> selectChapter2Experiment(3));
+        btnExpRainInvestigator.setOnAction(e -> selectChapter2Experiment(4));
 
-        HBox subNav = new HBox(8, btnExpTwoProjectile, btnExpRiverBoat, btnExpRainMan);
+        HBox subNav = new HBox(8, btnExpTwoProjectile, btnExpRiverBoat, btnExpRainMan, btnExpRainInvestigator);
         subNav.setAlignment(Pos.CENTER_LEFT);
         subNav.setPadding(new Insets(0, 0, 10, 0));
 
@@ -114,13 +128,23 @@ final class PlannedChapterView extends BorderPane {
     }
 
     void selectChapter2Experiment(int experimentIndex) {
-        if (experimentIndex == 3) {
+        if (experimentIndex == 4) {
+            relativeMotionWorkbench.controller().pause();
+            riverBoatWorkbench.controller().pause();
+            rainManWorkbench.controller().pause();
+            chapter2Container.setCenter(rainInvestigatorWorkbench);
+            styleActiveButton(btnExpRainInvestigator, true);
+            styleActiveButton(btnExpTwoProjectile, false);
+            styleActiveButton(btnExpRiverBoat, false);
+            styleActiveButton(btnExpRainMan, false);
+        } else if (experimentIndex == 3) {
             relativeMotionWorkbench.controller().pause();
             riverBoatWorkbench.controller().pause();
             chapter2Container.setCenter(rainManWorkbench);
             styleActiveButton(btnExpRainMan, true);
             styleActiveButton(btnExpTwoProjectile, false);
             styleActiveButton(btnExpRiverBoat, false);
+            styleActiveButton(btnExpRainInvestigator, false);
         } else if (experimentIndex == 2) {
             relativeMotionWorkbench.controller().pause();
             rainManWorkbench.controller().pause();
@@ -128,6 +152,7 @@ final class PlannedChapterView extends BorderPane {
             styleActiveButton(btnExpRiverBoat, true);
             styleActiveButton(btnExpTwoProjectile, false);
             styleActiveButton(btnExpRainMan, false);
+            styleActiveButton(btnExpRainInvestigator, false);
         } else {
             riverBoatWorkbench.controller().pause();
             rainManWorkbench.controller().pause();
@@ -135,6 +160,7 @@ final class PlannedChapterView extends BorderPane {
             styleActiveButton(btnExpTwoProjectile, true);
             styleActiveButton(btnExpRiverBoat, false);
             styleActiveButton(btnExpRainMan, false);
+            styleActiveButton(btnExpRainInvestigator, false);
         }
     }
 
@@ -160,6 +186,10 @@ final class PlannedChapterView extends BorderPane {
         return rainManWorkbench;
     }
 
+    RainInvestigatorWorkbenchView rainInvestigatorWorkbench() {
+        return rainInvestigatorWorkbench;
+    }
+
     Button returnButton() {
         return returnButton;
     }
@@ -174,6 +204,10 @@ final class PlannedChapterView extends BorderPane {
 
     Button btnExpRainMan() {
         return btnExpRainMan;
+    }
+
+    Button btnExpRainInvestigator() {
+        return btnExpRainInvestigator;
     }
 
     private VBox buildContent() {
@@ -250,6 +284,22 @@ final class PlannedChapterView extends BorderPane {
         }
     }
 
+    /**
+     * Pauses all running simulation controllers in Chapter 02 (Two-Projectile, River-Boat, Rain-Man).
+     * Used for reciprocal lifecycle pausing during chapter switching.
+     */
+    public void pauseAllSimulations() {
+        if (relativeMotionWorkbench != null && relativeMotionWorkbench.controller() != null) {
+            relativeMotionWorkbench.controller().pause();
+        }
+        if (riverBoatWorkbench != null && riverBoatWorkbench.controller() != null) {
+            riverBoatWorkbench.controller().pause();
+        }
+        if (rainManWorkbench != null && rainManWorkbench.controller() != null) {
+            rainManWorkbench.controller().pause();
+        }
+    }
+
     void setOnReturnToKinematics(Runnable callback) {
         this.onReturnToKinematics = callback;
     }
@@ -258,6 +308,7 @@ final class PlannedChapterView extends BorderPane {
         relativeMotionWorkbench.dispose();
         riverBoatWorkbench.dispose();
         rainManWorkbench.dispose();
+        rainInvestigatorWorkbench.dispose();
     }
 
     private static Node rule() {

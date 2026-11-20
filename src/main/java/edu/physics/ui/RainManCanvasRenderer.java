@@ -309,32 +309,61 @@ public final class RainManCanvasRenderer {
     }
 
     private void renderFrameBadges(GraphicsContext gc, RainManSimulationModel model, double w, double groundY) {
-        // Frame Pill Badge in Upper-Left
-        gc.setFill(Color.rgb(15, 23, 42, 0.75));
-        gc.fillRoundRect(14, 14, 250, 48, 6, 6);
-        gc.setStroke(Color.rgb(71, 85, 105, 0.80));
-        gc.setLineWidth(1.0);
-        gc.strokeRoundRect(14, 14, 250, 48, 6, 6);
+        // High-contrast, structured HUD card in Upper-Left
+        double cardW = 345.0;
+        double cardH = 84.0;
 
+        gc.setFill(Color.rgb(15, 23, 42, 0.88));
+        gc.fillRoundRect(14, 14, cardW, cardH, 6, 6);
+        gc.setStroke(Color.rgb(100, 116, 139, 0.90));
+        gc.setLineWidth(1.2);
+        gc.strokeRoundRect(14, 14, cardW, cardH, 6, 6);
+
+        // Line 1: Frame Title
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
-        gc.setFill(Color.web("#38bdf8")); // Cyan header
-        gc.fillText("⦿ OBSERVER FRAME (WALKER STATIONARY)", 22, 32);
+        gc.setFill(Color.web("#38bdf8")); // Vibrant cyan
+        gc.fillText("⦿ WALKER'S FRAME (OBSERVER STATIONARY AT CENTER)", 22, 30);
 
-        gc.setFont(Font.font("Consolas", 10.5));
+        // Line 2: Apparent Rain Vector & Speed
+        Vector2D vrm = model.apparentRainVelocity();
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
         gc.setFill(Color.web("#f8fafc"));
-        gc.fillText(String.format(Locale.ROOT, "v_{r/m} = (%.1f, -%.1f) m/s | |v| = %.1f m/s",
-                model.apparentRainVelocity().x(), model.vDown(), model.apparentRainSpeed()), 22, 49);
+        gc.fillText(String.format(Locale.ROOT, "v_(r/m) = v_r - v_m = (%+.1f i - %.1f j) m/s | |v| = %.1f m/s",
+                vrm.x(), model.vDown(), model.apparentRainSpeed()), 22, 46);
 
-        // Actual vs Optimal Angle Overlay on Canvas
-        gc.setFill(Color.rgb(15, 23, 42, 0.75));
-        gc.fillRoundRect(14, 70, 250, 32, 6, 6);
-        gc.setStroke(Color.rgb(71, 85, 105, 0.80));
-        gc.strokeRoundRect(14, 70, 250, 32, 6, 6);
+        // Line 3: Streamline explanation
+        String slantDesc;
+        if (Math.abs(vrm.x()) < 1e-4) {
+            slantDesc = "Streamline: Rain falls purely vertical (φ_opt = 0°)";
+        } else if (vrm.x() < 0) {
+            slantDesc = String.format(Locale.ROOT, "Streamline: Wind into face at %+.1f m/s (Slants from front)", vrm.x());
+        } else {
+            slantDesc = String.format(Locale.ROOT, "Streamline: Tailwind at %+.1f m/s (Slants from behind)", vrm.x());
+        }
+        gc.setFont(Font.font("Segoe UI", 9.5));
+        gc.setFill(Color.web("#cbd5e1"));
+        gc.fillText(slantDesc, 22, 61);
 
-        gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 10.5));
-        gc.setFill(Color.web("#e2e8f0"));
-        gc.fillText(String.format(Locale.ROOT, "Shaft: %+.1f°  |  Optimal: %+.1f°  |  Err: %.1f°",
-                model.umbrellaAngleDeg(), model.optimalAngleDeg(), model.angularErrorDeg()), 22, 90);
+        // Line 4: Umbrella Shaft vs Needed
+        RainManSimulationModel.AlignmentStatus status = model.alignmentStatus();
+        Color statusColor = switch (status) {
+            case WELL_ALIGNED -> Color.web("#34d399"); // Emerald
+            case SLIGHTLY_MISALIGNED -> Color.web("#fbbf24"); // Amber
+            default -> Color.web("#f87171"); // Red
+        };
+        String statusText = switch (status) {
+            case WELL_ALIGNED -> "WELL ALIGNED";
+            case SLIGHTLY_MISALIGNED -> "SLIGHTLY OFF";
+            default -> "MISALIGNED";
+        };
+
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
+        gc.setFill(Color.web("#f1f5f9"));
+        gc.fillText(String.format(Locale.ROOT, "Shaft: %+.1f°  |  Needed: %+.1f°  |",
+                model.umbrellaAngleDeg(), model.optimalAngleDeg()), 22, 77);
+
+        gc.setFill(statusColor);
+        gc.fillText(String.format(Locale.ROOT, " Err: %.1f° [%s]", model.angularErrorDeg(), statusText), 205, 77);
     }
 
     private void renderGroundFrameMiniature(GraphicsContext gc, RainManSimulationModel model, double timeSec, double w) {

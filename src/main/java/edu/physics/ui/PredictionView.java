@@ -259,7 +259,7 @@ final class PredictionView extends BorderPane {
             if (readyForEvaluation) {
                 statusLabel.setText("Experiment complete. Click 'REVEAL & COMPARE' to evaluate your hypothesis.");
             } else {
-                statusLabel.setText("Predictions locked! Run the experiment to touchdown (LANDED) before revealing results.");
+                statusLabel.setText("Predictions locked. Run the simulation in EXPERIMENT mode until touchdown to reveal the comparison.");
             }
         } catch (IllegalArgumentException ex) {
             statusLabel.setText("❌ " + ex.getMessage());
@@ -277,7 +277,7 @@ final class PredictionView extends BorderPane {
     void evaluatePredictions() {
         if (challenge == null || challenge.state() != PredictionChallenge.State.LOCKED) return;
         if (!isExperimentComplete()) {
-            statusLabel.setText("⚠ Predictions are locked. Run the simulation to touchdown (LANDED) before evaluating results.");
+            statusLabel.setText("Predictions locked. Run the simulation in EXPERIMENT mode until touchdown to reveal the comparison.");
             return;
         }
 

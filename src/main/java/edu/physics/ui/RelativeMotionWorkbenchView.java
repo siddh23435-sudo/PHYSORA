@@ -53,8 +53,13 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
     private final Label valEventTime = new Label();
     private final Label valEventLocation = new Label();
     private final Label valRelativeSpeed = new Label();
+    private final Label valRelativeAccel = new Label();
     private final Label valCollinearity = new Label();
     private final Label framePrincipleCard = new Label();
+
+    private final Label valueGuideTitle = new Label("💡 WHAT DO THESE VALUES SHOW? (STEP-BY-STEP BREAKDOWN)");
+    private final Label valueGuideBody = new Label();
+    private final VBox valueGuideCard = new VBox(4, valueGuideTitle, valueGuideBody);
 
     private final Button returnButton = new Button("⚗ RETURN TO KINEMATICS");
     private Runnable onReturnToKinematics;
@@ -181,10 +186,11 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
         sidebar.setMinWidth(345);
 
         ScrollPane sidebarScroll = new ScrollPane(sidebar);
+        sidebarScroll.getStyleClass().add("sidebar-scroll");
         sidebarScroll.setFitToWidth(true);
         sidebarScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         sidebarScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        sidebarScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-border-color: transparent;");
+        sidebarScroll.setStyle("-fx-background-color: #f5f1e5; -fx-background: #f5f1e5; -fx-border-color: transparent;");
         sidebarScroll.setPrefWidth(385);
         sidebarScroll.setMinWidth(355);
         sidebarScroll.setMaxWidth(405);
@@ -196,8 +202,8 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
     private VBox buildSidebar() {
         // 1. Scenario Preset Picker
         Label presetTitle = new Label("SCENARIO PRESETS (JEE BENCHMARKS)");
-        presetTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        presetTitle.setTextFill(PhysoraTheme.MUTED);
+        presetTitle.getStyleClass().add("inspector-heading");
+        presetTitle.setTextFill(Color.web("#334155"));
 
         ComboBox<String> presetCombo = new ComboBox<>();
         presetCombo.setId("scenarioPresetCombo");
@@ -230,8 +236,8 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
 
         // 2. Structured Analytical Inspector
         Label inspectorTitle = new Label("ANALYTICAL KINEMATICS AUTHORITY");
-        inspectorTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        inspectorTitle.setTextFill(PhysoraTheme.MUTED);
+        inspectorTitle.getStyleClass().add("inspector-heading");
+        inspectorTitle.setTextFill(Color.web("#334155"));
 
         analyticalStatusBadge.setFont(Font.font("Consolas", FontWeight.BOLD, 12));
         analyticalStatusBadge.setStyle("-fx-padding: 5 10 5 10; -fx-background-radius: 4px;");
@@ -245,14 +251,22 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
         addMetricRow(metricsGrid, 0, "Event Time:", valEventTime);
         addMetricRow(metricsGrid, 1, "Location:", valEventLocation);
         addMetricRow(metricsGrid, 2, "Relative Speed:", valRelativeSpeed);
-        addMetricRow(metricsGrid, 3, "Geometry:", valCollinearity);
+        addMetricRow(metricsGrid, 3, "Relative Accel:", valRelativeAccel);
+        addMetricRow(metricsGrid, 4, "Collision Rule:", valCollinearity);
 
         framePrincipleCard.setFont(Font.font("Segoe UI", 10.5));
         framePrincipleCard.setStyle("-fx-background-color: #eff6ff; -fx-text-fill: #1e40af; -fx-border-color: #bfdbfe; " +
                 "-fx-border-radius: 4px; -fx-padding: 6 8 6 8;");
         framePrincipleCard.setWrapText(true);
 
-        VBox inspectorBox = new VBox(6, inspectorTitle, analyticalStatusBadge, metricsGrid, framePrincipleCard);
+        valueGuideTitle.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
+        valueGuideTitle.setStyle("-fx-text-fill: #1e293b;");
+        valueGuideBody.setFont(Font.font("Segoe UI", 10));
+        valueGuideBody.setStyle("-fx-text-fill: #1e293b; -fx-line-spacing: 2.2px;");
+        valueGuideBody.setWrapText(true);
+        valueGuideCard.setStyle("-fx-background-color: #ffffff; -fx-padding: 10 12 10 12; -fx-border-color: #cbd5e1; -fx-border-radius: 6px; -fx-background-radius: 6px;");
+
+        VBox inspectorBox = new VBox(8, inspectorTitle, analyticalStatusBadge, metricsGrid, framePrincipleCard, valueGuideCard);
         inspectorBox.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 10;");
 
         VBox sidebar = new VBox(10, presetBox, velocityTrianglePane, inspectorBox);
@@ -261,12 +275,14 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
 
     private void addMetricRow(GridPane grid, int row, String labelText, Label valLabel) {
         Label lbl = new Label(labelText);
+        lbl.getStyleClass().add("metric-name");
         lbl.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11));
-        lbl.setTextFill(Color.web("#475569"));
+        lbl.setStyle("-fx-text-fill: #1e293b; -fx-font-weight: bold;");
         lbl.setMinWidth(90);
 
+        valLabel.getStyleClass().add("metric-value");
         valLabel.setFont(Font.font("Consolas", FontWeight.BOLD, 11));
-        valLabel.setTextFill(Color.web("#0f172a"));
+        valLabel.setStyle("-fx-text-fill: #0f172a;");
 
         grid.add(lbl, 0, row);
         grid.add(valLabel, 1, row);
@@ -369,11 +385,30 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
         ReferenceFrame activeFrame = controller.activeFrame();
         timeSlider.setMax(m.effectiveDuration());
 
-        // Perspective principle summary
-        framePrincipleCard.setText(String.format(Locale.ROOT,
-                "💡 Active Frame: %s\n%s",
-                activeFrame.frameClassification(),
-                activeFrame.pedagogicalPrinciple()));
+        // Contextual Frame Principle: Explicit real vs fictitious acceleration & gravity balance
+        String framePrinciple = switch (activeFrame) {
+            case GROUND ->
+                    "💡 INERTIAL LABORATORY FRAME S\n" +
+                    "• Reference: Fixed ground coordinates (0, 0)\n" +
+                    "• Real forces: Both projectiles accelerate under uniform downward gravity (g = 9.8 m/s²)\n" +
+                    "• Trajectories: Independent downward-curving parabolas\n" +
+                    "• Galilean vector sum: v_B(t) = v_A(t) + v_{B/A} holds at every instant";
+            case OBSERVER_A ->
+                    "💡 NON-INERTIAL (ACCELERATING) FRAME S_A\n" +
+                    "• Reference: Origin locked to Projectile A (accelerates downward at a_frame = -g j)\n" +
+                    "• Fictitious acceleration: a_fict = -a_frame = +g j balances downward gravity (-g j)\n" +
+                    "• Net acceleration: a_eff = a_real + a_fict = 0 ⟹ Projectile B moves at constant velocity along a straight line\n" +
+                    "• Invariance: v_{B/A} = v_B(t) - v_A(t) is strictly constant in time";
+            case OBSERVER_B ->
+                    "💡 NON-INERTIAL (ACCELERATING) FRAME S_B\n" +
+                    "• Reference: Origin locked to Projectile B (accelerates downward at a_frame = -g j)\n" +
+                    "• Fictitious acceleration: a_fict = -a_frame = +g j balances downward gravity (-g j)\n" +
+                    "• Net acceleration: a_eff = a_real + a_fict = 0 ⟹ Projectile A moves at constant velocity along a straight line\n" +
+                    "• Invariance: v_{A/B} = v_A(t) - v_B(t) = -v_{B/A} is strictly constant in time";
+        };
+        framePrincipleCard.setText(framePrinciple);
+
+        valRelativeAccel.setText("a_rel = a_B - a_A = 0.00 m/s² (Identical gravity g ↓)");
 
         if (m.hasCollision() && m.collisionTime().isPresent()) {
             double tCol = m.collisionTime().getAsDouble();
@@ -382,16 +417,16 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
             analyticalStatusBadge.setText("★ MID-AIR COLLISION DETECTED");
             analyticalStatusBadge.setStyle("-fx-background-color: #fef08a; -fx-text-fill: #854d0e; -fx-padding: 4 8 4 8; -fx-border-color: #facc15; -fx-border-radius: 4px;");
 
-            valEventTime.setText(String.format(Locale.ROOT, "t* = %.3f s (Agrees across frames)", tCol));
+            valEventTime.setText(String.format(Locale.ROOT, "t* = %.3f s (Invariant across frames)", tCol));
 
             String locText = switch (activeFrame) {
-                case GROUND -> String.format(Locale.ROOT, "(%.1f, %.1f) m (Ground S)", colPos.x(), colPos.y());
-                case OBSERVER_A -> "(0.0, 0.0) m (Observer A Origin)";
-                case OBSERVER_B -> "(0.0, 0.0) m (Observer B Origin)";
+                case GROUND -> String.format(Locale.ROOT, "(%.1f, %.1f) m [Ground S]", colPos.x(), colPos.y());
+                case OBSERVER_A -> "(0.0, 0.0) m [Observer A Origin]";
+                case OBSERVER_B -> "(0.0, 0.0) m [Observer B Origin]";
             };
             valEventLocation.setText(locText);
-            valRelativeSpeed.setText(String.format(Locale.ROOT, "|v_{B/A}| = %.2f m/s (CONSTANT)", m.relativeVelocityBA(0.0).magnitude()));
-            valCollinearity.setText("Collinear: r_{B/A}(0) \u2225 v_{B/A} (Intercept)");
+            valRelativeSpeed.setText(String.format(Locale.ROOT, "|v_B/A| = %.2f m/s (Constant: a_rel = 0)", m.relativeVelocityBA(0.0).magnitude()));
+            valCollinearity.setText("Direct Intercept: v_B/A is anti-parallel to r_B/A(0); t* = d0/|v_rel| <= min(t_land,A, t_land,B)");
         } else {
             double dMin = m.analyticalResult().dMinInterval();
             double tMin = m.analyticalResult().tMinInterval();
@@ -402,14 +437,73 @@ public final class RelativeMotionWorkbenchView extends BorderPane {
             valEventTime.setText(String.format(Locale.ROOT, "t* = %.3f s (Closest Approach)", tMin));
 
             String locText = switch (activeFrame) {
-                case GROUND -> String.format(Locale.ROOT, "Separation d_min = %.2f m", dMin);
-                case OBSERVER_A -> String.format(Locale.ROOT, "Distance to Origin = %.2f m", dMin);
-                case OBSERVER_B -> String.format(Locale.ROOT, "Distance to Origin = %.2f m", dMin);
+                case GROUND -> String.format(Locale.ROOT, "Separation d_min = %.2f m [Ground S]", dMin);
+                case OBSERVER_A -> String.format(Locale.ROOT, "Distance to Origin = %.2f m [S_A]", dMin);
+                case OBSERVER_B -> String.format(Locale.ROOT, "Distance to Origin = %.2f m [S_B]", dMin);
             };
             valEventLocation.setText(locText);
-            valRelativeSpeed.setText(String.format(Locale.ROOT, "|v_{B/A}| = %.2f m/s (CONSTANT)", m.relativeVelocityBA(0.0).magnitude()));
-            valCollinearity.setText(String.format(Locale.ROOT, "Non-Collinear: Misses Origin by %.2f m", dMin));
+            valRelativeSpeed.setText(String.format(Locale.ROOT, "|v_B/A| = %.2f m/s (Constant: a_rel = 0)", m.relativeVelocityBA(0.0).magnitude()));
+            valCollinearity.setText(String.format(Locale.ROOT, "Non-Intercept: Closest separation d_min = %.2f m at t = %.3f s <= min(t_land,A, t_land,B)", dMin, tMin));
         }
+
+        // Detailed Step-by-Step Value Decomposition Guide
+        Vector2D pA0 = m.bodyA().initialPosition();
+        Vector2D vA0 = m.bodyA().initialVelocity();
+        Vector2D pB0 = m.bodyB().initialPosition();
+        Vector2D vB0 = m.bodyB().initialVelocity();
+        double d0 = pA0.distanceTo(pB0);
+        Vector2D vBA = m.relativeVelocityBA(0.0);
+        double vRelMag = vBA.magnitude();
+        double tFlight = m.effectiveDuration();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format(Locale.ROOT,
+                "1. GIVEN LAUNCH CONDITIONS & SEPARATION:\n" +
+                "   • Projectile A: Launched from (%.1f, %.1f) m @ (%+.1f i + %.1f j) m/s (|vA| = %.1f m/s).\n" +
+                "   • Projectile B: Launched from (%.1f, %.1f) m @ (%+.1f i + %.1f j) m/s (|vB| = %.1f m/s).\n" +
+                "   • Initial separation: d0 = |r_B(0) - r_A(0)| = %.1f m.\n\n",
+                pA0.x(), pA0.y(), vA0.x(), vA0.y(), vA0.magnitude(),
+                pB0.x(), pB0.y(), vB0.x(), vB0.y(), vB0.magnitude(),
+                d0));
+
+        sb.append(String.format(Locale.ROOT,
+                "2. WHY RELATIVE MOTION IS A PURE STRAIGHT LINE:\n" +
+                "   • Both projectiles accelerate under identical gravity: a_A = a_B = -g j.\n" +
+                "   • Relative acceleration: a_{B/A} = a_B - a_A = (-g j) - (-g j) = 0.00 m/s².\n" +
+                "   • Relative velocity is strictly CONSTANT in time: v_{B/A} = (%+.1f i + %+.1f j) m/s (|v_rel| = %.2f m/s).\n" +
+                "   • In Observer B frame (or A), the projectile does not curve; it moves in a pure straight line!\n\n",
+                vBA.x(), vBA.y(), vRelMag));
+
+        if (m.hasCollision() && m.collisionTime().isPresent()) {
+            double tCol = m.collisionTime().getAsDouble();
+            sb.append(String.format(Locale.ROOT,
+                    "3. COLLISION TIME DERIVATION:\n" +
+                    "   • Relative velocity vector v_{B/A} points directly along the line of sight toward origin.\n" +
+                    "   • Time to collision: t* = d0 / |v_rel| = %.1f m / %.2f m/s = %.3f s.\n\n",
+                    d0, vRelMag, tCol));
+
+            sb.append(String.format(Locale.ROOT,
+                    "4. FLIGHT TIME GROUND VALIDITY:\n" +
+                    "   • Ground flight duration: t_flight = %.2f s.\n" +
+                    "   • Mid-air condition: t* <= min(t_land,A, t_land,B) ⟹ %.3f s <= %.2f s ⟹ VALID MID-AIR COLLISION!",
+                    tFlight, tCol, tFlight));
+        } else {
+            double dMin = m.analyticalResult().dMinInterval();
+            double tMin = m.analyticalResult().tMinInterval();
+            sb.append(String.format(Locale.ROOT,
+                    "3. CLOSEST APPROACH CALCULATION:\n" +
+                    "   • Relative velocity is not directly anti-parallel to line of sight.\n" +
+                    "   • Closest approach occurs at t* = %.3f s with minimum distance d_min = %.2f m.\n\n",
+                    tMin, dMin));
+
+            sb.append(String.format(Locale.ROOT,
+                    "4. FLIGHT TIME GROUND VALIDITY:\n" +
+                    "   • Ground flight duration: t_flight = %.2f s.\n" +
+                    "   • Closest approach occurs before landing: t* = %.3f s <= %.2f s.",
+                    tFlight, tMin, tFlight));
+        }
+
+        valueGuideBody.setText(MathTypography.formatText(sb.toString()));
     }
 
     private void updateFrameButtonStyles(ReferenceFrame active) {

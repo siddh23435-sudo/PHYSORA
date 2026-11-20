@@ -333,25 +333,47 @@ public final class RiverBoatCanvasRenderer {
     }
 
     private void drawHud(GraphicsContext gc, double w, double h, RiverBoatSimulationModel model, double time) {
-        // Overlay HUD Card (Top-Left, positioned well above the north shoreline)
-        gc.setFill(Color.web("#fcfbf7", 0.94));
-        gc.fillRoundRect(16, 10, 260, 72, 6, 6);
-        gc.setStroke(Color.web("#cbc4b4"));
-        gc.setLineWidth(1.0);
-        gc.strokeRoundRect(16, 10, 260, 72, 6, 6);
+        // High-contrast, structured HUD Card in Top-Left
+        double cardW = 330.0;
+        double cardH = 88.0;
+
+        gc.setFill(Color.web("#fcfbf7", 0.96));
+        gc.fillRoundRect(16, 10, cardW, cardH, 6, 6);
+        gc.setStroke(Color.web("#cbd5e1"));
+        gc.setLineWidth(1.2);
+        gc.strokeRoundRect(16, 10, cardW, cardH, 6, 6);
 
         Vector2D pos = model.boatPosition(time);
+        Vector2D vRel = model.velocityBoatRelative();
+        Vector2D u = model.velocityRiverGround();
         Vector2D vG = model.velocityBoatGround();
+        double vxClean = Math.abs(vG.x()) < 1e-6 ? 0.0 : vG.x();
+        double courseDeg = Math.toDegrees(Math.atan2(vxClean, Math.max(1e-6, vG.y())));
+        double maxTime = model.analyticalResult().crossingTime().orElse(25.0);
 
         gc.setFill(Color.web("#0f172a"));
         gc.setFont(Font.font("Segoe UI", FontWeight.BOLD, 11.0));
-        gc.fillText(String.format(Locale.US, "SIMULATION TIME: t = %.2f s", time), 24, 26);
+        gc.fillText(String.format(Locale.US, "SIMULATION TIME: t = %.2f s / %.2f s", time, maxTime), 24, 25);
 
-        gc.setFont(Font.font("Consolas", FontWeight.NORMAL, 10.5));
-        gc.setFill(Color.web("#334155"));
-        gc.fillText(String.format(Locale.US, "Position : (x = %.1f m, y = %.1f m)", pos.x(), pos.y()), 24, 42);
-        gc.fillText(String.format(Locale.US, "v_ground : (%.2f i + %.2f j) m/s", vG.x(), vG.y()), 24, 57);
-        gc.fillText(String.format(Locale.US, "Steering : θ = %.1f° upstream", model.headingAngleDeg()), 24, 72);
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.0));
+        gc.setFill(Color.web("#047857")); // Emerald for water velocity
+        gc.fillText(String.format(Locale.US, "Water Heading : vb=%.1f m/s @ %.1f° upstream ⟹ (%+.1fi, %+.1fj)",
+                model.boatSpeed(), model.headingAngleDeg(), vRel.x(), vRel.y()), 24, 41);
+
+        gc.setFill(Color.web("#c2410c")); // Orange for current
+        gc.fillText(String.format(Locale.US, "River Current : u=+%.1f m/s downstream ⟹ (%+.1fi, 0.0j)",
+                model.riverSpeed(), u.x()), 24, 56);
+
+        gc.setFill(Color.web("#2453d4")); // Cobalt for ground course
+        String courseStatus = Math.abs(courseDeg) < 0.05
+                ? "α=0.0° [ZERO DRIFT]"
+                : String.format(Locale.US, "α=%+.1f° drift", courseDeg);
+        gc.fillText(String.format(Locale.US, "Ground Track  : v_g = (%+.2fi, %+.2fj) m/s ⟹ %s",
+                vxClean, vG.y(), courseStatus), 24, 71);
+
+        gc.setFont(Font.font("Segoe UI", 9.5));
+        gc.setFill(Color.web("#475569"));
+        gc.fillText(String.format(Locale.US, "Boat Position : (x = %.1f m, y = %.1f m)", pos.x(), pos.y()), 24, 86);
 
         // Top-Right Landing or Asymptotic Badge
         if (model.isLanded(time)) {

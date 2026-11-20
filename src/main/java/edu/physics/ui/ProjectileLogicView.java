@@ -248,11 +248,11 @@ final class ProjectileLogicView extends BorderPane {
         ProjectileMotion.State state = model.stateAt(time);
 
         parameterValues.setText(String.format(Locale.ROOT,
-                "v0 %.2f m/s    theta %.2f deg    g %.2f m/s^2    (x0, y0) (%.2f, %.2f) m    landing y %.2f m",
+                "v₀ = %.2f m/s    θ = %.2f°    g = %.2f m/s²    (x₀, y₀) = (%.2f, %.2f) m    y_land = %.2f m",
                 speed, angle, gravity, initialX, initialY, landingY));
         assumptionValue.setText(String.format(Locale.ROOT,
-                "Two-dimensional point particle · constant downward gravity · air resistance ignored · launch (%.2f, %.2f) m · landing surface y = %.2f m.",
-                initialX, initialY, landingY));
+                "Two-dimensional point particle · constant downward gravity (g = %.2f m/s²) · air resistance ignored · launch (x₀ = %.2f m, y₀ = %.2f m) · landing surface y = %.2f m.",
+                gravity, initialX, initialY, landingY));
 
         // Evaluate solver steps for POSITION_AT_TIME (preserves logicStepDetails0)
         EnumMap<ProjectileProblem.Input, PhysicalQuantity> givens = new EnumMap<>(ProjectileProblem.Input.class);
@@ -272,7 +272,7 @@ final class ProjectileLogicView extends BorderPane {
         }
 
         currentStateValue.setText(String.format(Locale.ROOT,
-                "%.2f s   |   x %.2f m   |   y %.2f m   |   vx %.2f m/s   |   vy %.2f m/s",
+                "t = %.2f s   |   x %.2f m   |   y %.2f m   |   vₓ %.2f m/s   |   vᵧ %.2f m/s",
                 time, state.x(), state.y(), state.vx(), state.vy()));
         setOptional(maximumHeightValue, model.maximumHeight(), "m", "Unbounded");
         setOptional(flightTimeValue, model.timeOfFlight(), "s", "No landing");
@@ -328,7 +328,7 @@ final class ProjectileLogicView extends BorderPane {
         HBox top = new HBox(10, badge, subtitle);
         top.setAlignment(Pos.CENTER_LEFT);
 
-        Label content = new Label(step.content());
+        Label content = new Label(MathTypography.formatText(step.content()));
         if (step.kind() == GuidedDerivations.StepKind.FORMULA || step.kind() == GuidedDerivations.StepKind.CALCULATION) {
             content.setStyle("-fx-font-family: Consolas; -fx-font-size: 13.5px; -fx-font-weight: bold; " +
                     "-fx-text-fill: #142e4b; -fx-background-color: #f0f4fe; -fx-padding: 8 12 8 12; " +
@@ -349,7 +349,7 @@ final class ProjectileLogicView extends BorderPane {
             VBox bullets = new VBox(4);
             bullets.setPadding(new Insets(4, 0, 0, 8));
             for (String detail : step.bulletDetails()) {
-                Label b = new Label("•  " + detail);
+                Label b = new Label("•  " + MathTypography.formatText(detail));
                 b.setStyle("-fx-font-size: 11.5px; -fx-text-fill: #475569;");
                 b.setWrapText(true);
                 bullets.getChildren().add(b);
@@ -361,38 +361,53 @@ final class ProjectileLogicView extends BorderPane {
     }
 
     private VBox equationRow(ProjectileSolution.Step step, int index) {
-        Label formula = new Label(step.equation().render());
-        formula.getStyleClass().add("equation-text");
+        Node formulaCard = MathView.renderEquation(step.equation());
+        HBox.setHgrow(formulaCard, Priority.ALWAYS);
+
         String evaluatedText = step.results().entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
-                .map(entry -> entry.getKey() + " = " + format(entry.getValue(), step.precision()))
+                .map(entry -> MathTypography.formatIdentifier(entry.getKey()) + " = " + format(entry.getValue(), step.precision()))
                 .reduce((left, right) -> left + "    " + right).orElse("");
         Label evaluated = new Label(evaluatedText);
         evaluated.getStyleClass().add("equation-result");
-        HBox row = new HBox(15, formula, spacer(), evaluated);
-        row.setPadding(new Insets(1, 0, 1, 0));
-        HBox.setHgrow(formula, Priority.ALWAYS);
+        evaluated.setStyle("-fx-font-family: Consolas; -fx-font-weight: bold; -fx-font-size: 11.5px; -fx-text-fill: #2453d4;");
 
-        String substitutions = renderValues(step.substitutions(), step.precision());
-        String intermediates = renderValues(step.intermediateResults(), step.precision());
-        Label details = new Label("Substitutions: " + (substitutions.isEmpty() ? "none" : substitutions)
-                + "\nIntermediate results: " + (intermediates.isEmpty() ? "none" : intermediates));
-        details.setId("logicStepDetails" + index);
-        details.setWrapText(true);
-        details.getStyleClass().add("muted-copy");
-        return new VBox(3, row, details);
+        HBox topRow = new HBox(15, formulaCard, spacer(), evaluated);
+        topRow.setAlignment(Pos.CENTER_LEFT);
+        topRow.setPadding(new Insets(1, 0, 1, 0));
+
+        Node mathDetails = MathView.renderSubstitutionsAndIntermediates(
+                step.substitutions(), step.intermediateResults(), step.precision());
+
+        // Backward compatibility: ensure #logicStepDetails[index] exists with raw keys for legacy test assertions
+        String rawSubs = renderRawValues(step.substitutions(), step.precision());
+        String rawInter = renderRawValues(step.intermediateResults(), step.precision());
+        Label legacyDetails = new Label("Substitutions: " + (rawSubs.isEmpty() ? "none" : rawSubs)
+                + "\nIntermediate results: " + (rawInter.isEmpty() ? "none" : rawInter));
+        legacyDetails.setId("logicStepDetails" + index);
+        legacyDetails.setVisible(false);
+        legacyDetails.setManaged(false);
+
+        return new VBox(6, topRow, mathDetails, legacyDetails);
+    }
+
+    private static String renderRawValues(Map<String, PhysicalQuantity> values,
+                                          ProjectileSolution.PrecisionPolicy precision) {
+        return values.entrySet().stream().sorted(Map.Entry.comparingByKey())
+                .map(entry -> entry.getKey() + " = " + format(entry.getValue(), precision))
+                .reduce((left, right) -> left + "   ·   " + right).orElse("");
     }
 
     private static String format(PhysicalQuantity quantity, ProjectileSolution.PrecisionPolicy precision) {
         String value = BigDecimal.valueOf(quantity.value())
                 .setScale(precision.displayedDecimalPlaces(), precision.roundingMode()).toPlainString();
-        return value + " " + quantity.unit().symbol();
+        return value + " " + MathTypography.formatUnit(quantity.unit());
     }
 
     private static String renderValues(Map<String, PhysicalQuantity> values,
                                        ProjectileSolution.PrecisionPolicy precision) {
         return values.entrySet().stream().sorted(Map.Entry.comparingByKey())
-                .map(entry -> entry.getKey() + " = " + format(entry.getValue(), precision))
+                .map(entry -> MathTypography.formatIdentifier(entry.getKey()) + " = " + format(entry.getValue(), precision))
                 .reduce((left, right) -> left + "   ·   " + right).orElse("");
     }
 

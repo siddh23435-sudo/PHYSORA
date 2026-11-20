@@ -116,12 +116,12 @@ final class ProjectileCanvasRenderer {
             gc.strokeLine(originX, vp.top(), originX, vp.bottom());
         }
 
-        gc.setFill(PhysoraTheme.MUTED);
-        gc.setFont(Font.font("Consolas", 10));
+        gc.setFill(Color.web("#475569"));
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
         gc.fillText("x / m", vp.right() - 32, Math.min(vp.bottom() - 5, groundY + 24));
         gc.fillText("y / m", Math.max(vp.left() + 4, originX + 7), vp.top() + 11);
 
-        gc.setFont(Font.font("Consolas", 9));
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 9.5));
         // X-axis ticks
         for (TrajectoryViewport.Tick tick : vp.xTicks()) {
             double sx = tick.screenCoordinate();
@@ -161,7 +161,7 @@ final class ProjectileCanvasRenderer {
     private void drawTrajectory(GraphicsContext gc, TrajectoryViewport vp) {
         if (sampledX.length == 0) return;
         gc.setStroke(PhysoraTheme.COBALT);
-        gc.setLineWidth(2.4);
+        gc.setLineWidth(2.8);
         gc.beginPath();
         gc.moveTo(vp.toScreenX(sampledX[0]), vp.toScreenY(sampledY[0]));
         for (int i = 1; i < sampledX.length; i++) {
@@ -222,10 +222,10 @@ final class ProjectileCanvasRenderer {
                 Math.max(Math.abs(state.vx()), Math.abs(state.vy()))));
         double vxLength = state.vx() * velocityScale;
         double vyLength = state.vy() * velocityScale;
-        gc.setLineWidth(2.1);
+        gc.setLineWidth(2.4);
         drawArrow(gc, x, y, x + vxLength, y, PhysoraTheme.COBALT);
         drawArrow(gc, x + vxLength, y, x + vxLength, y - vyLength, PhysoraTheme.ORANGE);
-        gc.setFont(Font.font("Consolas", 10));
+        gc.setFont(Font.font("Consolas", FontWeight.BOLD, 10.5));
         gc.setFill(PhysoraTheme.COBALT);
         gc.fillText(String.format(Locale.ROOT, "vx %.2f m/s", state.vx()),
                 x + vxLength + 6, y + 15);
