@@ -4,8 +4,6 @@ import edu.physics.relative.ReferenceFrame;
 import edu.physics.relative.TwoProjectilePursuitModel;
 import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import javafx.stage.Stage;

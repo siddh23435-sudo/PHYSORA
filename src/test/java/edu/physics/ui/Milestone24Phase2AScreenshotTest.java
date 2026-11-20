@@ -1,11 +1,8 @@
 package edu.physics.ui;
 
-import edu.physics.relative.RainManSimulationModel;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import javafx.stage.Stage;
@@ -24,8 +21,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DisplayName("Milestone 2.4 Phase 2A - Rain-Man Forward Experiment Visual Acceptance & Screenshot Capture")
 class Milestone24Phase2AScreenshotTest {

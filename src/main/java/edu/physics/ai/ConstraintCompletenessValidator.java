@@ -2,7 +2,6 @@ package edu.physics.ai;
 
 import edu.physics.problem.CanonicalPhysicsProblem;
 import edu.physics.problem.PhysicalQuantity;
-import edu.physics.problem.PhysicalUnit;
 import edu.physics.problem.PhysicsCapabilityRegistry;
 import edu.physics.problem.ProjectileProblem;
 import edu.physics.projectile.LandingSurface;

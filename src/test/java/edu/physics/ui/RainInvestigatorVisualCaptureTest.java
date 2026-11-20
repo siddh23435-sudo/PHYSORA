@@ -3,7 +3,6 @@ package edu.physics.ui;
 import edu.physics.relative.RainInvestigatorPreset;
 import edu.physics.relative.RainInvestigatorSessionModel;
 import edu.physics.relative.RainInvestigatorStage;
-import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
@@ -23,7 +22,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @DisplayName("Inverse Rain Investigator - Five-Stage Visual Evidence Capture & Resolution Verification")
 class RainInvestigatorVisualCaptureTest {

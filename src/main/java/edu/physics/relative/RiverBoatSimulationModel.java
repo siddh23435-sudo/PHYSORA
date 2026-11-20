@@ -3,7 +3,6 @@ package edu.physics.relative;
 import edu.physics.simulation.Vector2D;
 
 import java.util.Objects;
-import java.util.OptionalDouble;
 
 /**
  * Authoritative physical simulation model for river-boat vector crossing problems.

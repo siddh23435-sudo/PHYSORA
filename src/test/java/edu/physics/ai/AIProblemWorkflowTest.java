@@ -2,7 +2,6 @@ package edu.physics.ai;
 
 import edu.physics.problem.CanonicalPhysicsProblem;
 import edu.physics.problem.CanonicalPhysicsProblem.AngleReference;
-import edu.physics.problem.CanonicalPhysicsProblem.StandardTarget;
 import edu.physics.problem.CanonicalPhysicsProblem.SurfaceTarget;
 import edu.physics.problem.CanonicalSolution;
 import edu.physics.problem.PhysicalQuantity;

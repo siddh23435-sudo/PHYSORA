@@ -1,7 +1,6 @@
 package edu.physics.ui;
 
 import edu.physics.projectile.ProjectileMotion;
-import javafx.beans.value.ChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -9,7 +8,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
-import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.BorderPane;
@@ -22,8 +20,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
 import java.util.Locale;
-import java.util.IdentityHashMap;
-import java.util.Map;
 import java.util.OptionalDouble;
 
 /** Coordinates the chapter workspace, model inputs, and the two live model views. */
@@ -289,10 +285,6 @@ final class NormalBenchView extends BorderPane {
                 model.gravity(), model.initialX(), model.initialY(), model.landingY()));
     }
 
-    private static String formatInput(double value) {
-        return String.format(Locale.ROOT, "%.2f", value);
-    }
-
     private VBox buildFooter() {
         HBox results = new HBox(0,
                 result("POSITION", positionOutput),
@@ -450,12 +442,6 @@ final class NormalBenchView extends BorderPane {
         return label;
     }
 
-    private static Label notation(String text) {
-        Label label = new Label(text);
-        label.getStyleClass().add("hero-notation-text");
-        return label;
-    }
-
     private static Label outputValue() {
         Label label = new Label("—");
         label.getStyleClass().add("result-value");
@@ -464,25 +450,11 @@ final class NormalBenchView extends BorderPane {
         return label;
     }
 
-    private static Node rule() {
-        Region rule = new Region();
-        rule.setPrefSize(1, 32);
-        rule.setMinWidth(1);
-        rule.getStyleClass().add("vertical-rule");
-        return rule;
-    }
-
     private static Node separator() {
         Region rule = new Region();
         rule.setPrefHeight(1);
         rule.getStyleClass().add("horizontal-rule");
         return rule;
-    }
-
-    private static Region spacer() {
-        Region region = new Region();
-        HBox.setHgrow(region, Priority.ALWAYS);
-        return region;
     }
 
     private static String optional(OptionalDouble value, String unit, String empty) {

@@ -1,6 +1,5 @@
 package edu.physics.ui;
 
-import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;

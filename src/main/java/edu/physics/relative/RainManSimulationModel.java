@@ -2,7 +2,6 @@ package edu.physics.relative;
 
 import edu.physics.simulation.Vector2D;
 
-import java.util.Objects;
 
 /**
  * Authoritative physical simulation model for Rain-Man relative motion and umbrella orientation.

@@ -1,7 +1,6 @@
 package edu.physics.ui;
 
 import edu.physics.ai.ProviderMode;
-import edu.physics.problem.PredictionChallenge;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;

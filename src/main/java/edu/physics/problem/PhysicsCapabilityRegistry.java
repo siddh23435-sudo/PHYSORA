@@ -1,6 +1,5 @@
 package edu.physics.problem;
 
-import edu.physics.projectile.LandingSurface;
 
 import java.util.ArrayList;
 import java.util.Collection;

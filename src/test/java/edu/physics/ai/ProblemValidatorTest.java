@@ -5,7 +5,6 @@ import edu.physics.problem.PhysicalQuantity;
 import edu.physics.problem.PhysicalUnit;
 import edu.physics.problem.ProjectileProblem;
 import edu.physics.problem.ProjectileProblemSequence;
-import edu.physics.projectile.LandingSurface;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

@@ -4,7 +4,6 @@ import edu.physics.ai.AIConversationService;
 import edu.physics.ai.AIProblemWorkflow;
 import edu.physics.ai.AIWorkflowResult;
 import edu.physics.ai.ExplanationVerifier;
-import edu.physics.ai.InterpretationDraft;
 import edu.physics.ai.InterpretationRequest;
 import edu.physics.ai.ProblemValidationResult;
 import edu.physics.ai.ProblemValidator;
@@ -12,8 +11,6 @@ import edu.physics.ai.SolutionVerifier;
 import edu.physics.ai.SolverOrchestrator;
 import edu.physics.ai.local.LocalAIProvider;
 import edu.physics.problem.GuidedDerivations;
-import edu.physics.problem.PhysicalQuantity;
-import edu.physics.problem.PhysicalUnit;
 import edu.physics.problem.ProjectileProblem;
 import edu.physics.problem.ProjectileProblemSolver;
 import edu.physics.projectile.ProjectileMotion;
@@ -29,7 +26,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.OptionalDouble;
 import java.util.concurrent.Callable;
 

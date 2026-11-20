@@ -3,7 +3,6 @@ package edu.physics.ui;
 import edu.physics.projectile.ProjectileMotion;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.OptionalDouble;
 
 import static org.junit.jupiter.api.Assertions.*;

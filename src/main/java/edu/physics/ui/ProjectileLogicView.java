@@ -21,13 +21,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
 import java.math.BigDecimal;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalDouble;
@@ -41,7 +39,6 @@ final class ProjectileLogicView extends BorderPane {
     private final ProjectileSimulationController controller;
     private final ProjectileProblemSolver solver = new ProjectileProblemSolver();
 
-    private final VBox derivationContainer = new VBox(10);
     private final VBox rawDerivationSteps = new VBox(6);
     private final Label parameterValues = new Label();
     private final Label currentStateValue = new Label();
@@ -402,13 +399,6 @@ final class ProjectileLogicView extends BorderPane {
         String value = BigDecimal.valueOf(quantity.value())
                 .setScale(precision.displayedDecimalPlaces(), precision.roundingMode()).toPlainString();
         return value + " " + MathTypography.formatUnit(quantity.unit());
-    }
-
-    private static String renderValues(Map<String, PhysicalQuantity> values,
-                                       ProjectileSolution.PrecisionPolicy precision) {
-        return values.entrySet().stream().sorted(Map.Entry.comparingByKey())
-                .map(entry -> MathTypography.formatIdentifier(entry.getKey()) + " = " + format(entry.getValue(), precision))
-                .reduce((left, right) -> left + "   ·   " + right).orElse("");
     }
 
     private static void setOptional(Label label, OptionalDouble result, String unit, String empty) {

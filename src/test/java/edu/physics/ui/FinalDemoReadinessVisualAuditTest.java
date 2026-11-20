@@ -2,12 +2,9 @@ package edu.physics.ui;
 
 import edu.physics.ai.ProviderMode;
 import edu.physics.relative.RainInvestigatorPreset;
-import edu.physics.relative.RainInvestigatorSessionModel;
 import edu.physics.relative.RainInvestigatorStage;
 import edu.physics.relative.ReferenceFrame;
 import edu.physics.relative.TwoProjectilePursuitModel;
-import javafx.application.Platform;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;

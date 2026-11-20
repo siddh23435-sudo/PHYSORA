@@ -1,6 +1,5 @@
 package edu.physics.ui;
 
-import edu.physics.relative.RainInvestigatorPreset;
 import edu.physics.relative.RainInvestigatorResult;
 import edu.physics.relative.RainInvestigatorSessionModel;
 import edu.physics.relative.RainInvestigatorStage;
@@ -45,7 +44,6 @@ public final class RainInvestigatorCanvasRenderer {
     private static final Color RECONSTRUCTED_COLOR = Color.web("#10b981"); // Emerald Green
     private static final Color CANDIDATE_COLOR = Color.web("#22d3ee"); // Cyan
     private static final Color ERROR_COLOR = Color.web("#ef4444"); // Red
-    private static final Color WARNING_COLOR = Color.web("#f59e0b"); // Amber
 
     private final Canvas canvas = new Canvas(600, 380);
     private double candidateVDown = 8.0;

@@ -10,7 +10,6 @@ import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 
-import java.util.Optional;
 import java.util.OptionalDouble;
 
 /** Shares one analytical model and one simulation clock between all bench views. */

@@ -1,7 +1,5 @@
 package edu.physics.ui;
 
-import edu.physics.problem.PhysicsCapabilityRegistry;
-import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;

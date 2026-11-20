@@ -2,13 +2,8 @@ package edu.physics.ui;
 
 import edu.physics.relative.RiverBoatCrossingType;
 import edu.physics.relative.RiverBoatSimulationModel;
-import edu.physics.simulation.Vector2D;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
-import javafx.scene.control.TextField;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

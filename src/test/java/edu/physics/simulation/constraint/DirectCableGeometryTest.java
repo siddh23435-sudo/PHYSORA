@@ -6,7 +6,6 @@ import edu.physics.simulation.RigidBodyState;
 import edu.physics.simulation.SimulationWorld;
 import edu.physics.simulation.Vector2D;
 import edu.physics.simulation.geometry.CircleShape;
-import edu.physics.simulation.geometry.PointMassShape;
 import edu.physics.simulation.geometry.RectangleShape;
 import edu.physics.simulation.scene.AnchorRef;
 import edu.physics.simulation.scene.AttachmentPoint;
@@ -19,15 +18,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

@@ -5,7 +5,6 @@ import edu.physics.problem.PhysicalUnit;
 import edu.physics.problem.ProjectileProblem;
 
 import java.util.EnumMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Converts validated quantities to the canonical units expected by the projectile domain. */
