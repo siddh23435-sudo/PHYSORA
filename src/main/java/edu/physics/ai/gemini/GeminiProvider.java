@@ -142,7 +142,16 @@ public final class GeminiProvider implements AIProvider, AutoCloseable {
                 EnumMap<ProjectileProblem.Input, PhysicalQuantity> givens = new EnumMap<>(ProjectileProblem.Input.class);
                 for (QuantityWire quantity : part.givens()) {
                     ProjectileProblem.Input input = ProjectileProblem.Input.valueOf(quantity.input());
-                    PhysicalQuantity physicalQuantity = new PhysicalQuantity(quantity.value(), PhysicalUnit.valueOf(quantity.unit()));
+                    PhysicalUnit unit = PhysicalUnit.valueOf(quantity.unit());
+                    // Gemini sometimes returns inferred zero elevation/landing height with dimensionless unit (ONE).
+                    // Normalize ONLY dimensionless ONE to METRE for zero-valued LENGTH inputs.
+                    // Explicit incompatible units (e.g. SECOND, RADIAN) must never be coerced and remain rejected.
+                    if (unit == PhysicalUnit.ONE
+                            && input.dimension() == PhysicalUnit.Dimension.LENGTH
+                            && quantity.value() == 0.0) {
+                        unit = PhysicalUnit.METRE;
+                    }
+                    PhysicalQuantity physicalQuantity = new PhysicalQuantity(quantity.value(), unit);
                     if (givens.putIfAbsent(input, physicalQuantity) != null) {
                         throw new IllegalArgumentException("duplicate given " + input);
                     }

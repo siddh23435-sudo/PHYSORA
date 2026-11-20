@@ -35,7 +35,11 @@ public final class LocalAIProvider implements AIProvider {
     private static final Pattern HORIZONTAL_PATTERN = Pattern.compile(
             "(?i)\\b(?:horizontally|horizontal projection)\\b");
     private static final Pattern GRAVITY_PATTERN = Pattern.compile(
-            "(?i)(?:g\\s*=\\s*|gravity\\s*(?:of|=|is)?\\s*|take\\s+g\\s*=\\s*)(\\d+(?:\\.\\d+)?)\\s*(?:m/s\\^?2|mps2)?");
+            "(?i)(?:" +
+            "g\\s*=\\s*" +                                                // g = 10
+            "|gravity\\s*(?:\\(g\\))?\\s*(?:of|=|is|as)?\\s*" +           // gravity (g) as 10, gravity = 10
+            "|tak(?:e|ing)\\s+(?:gravity\\s*(?:\\(g\\))?\\s*(?:as|=|is)?\\s*|g\\s*(?:=|as)\\s*)" + // Taking gravity (g) as 10, take g = 10
+            ")(\\d+(?:\\.\\d+)?)\\s*(?:m/s[\\^]?2|m/s\u00b2|mps2)?");     // m/s^2, m/s², m/s2
     private static final Pattern TOWER_HEIGHT_PATTERN = Pattern.compile(
             "(?i)(?:from\\s+(?:a\\s+)?(?:tower|cliff|platform|height)\\s+(?:of\\s+)?|initial\\s+height\\s*(?:of|=|is)?\\s*)(\\d+(?:\\.\\d+)?)\\s*(?:m|meters|metres)\\b");
     private static final Pattern TIME_PARAM_PATTERN = Pattern.compile(
@@ -46,12 +50,21 @@ public final class LocalAIProvider implements AIProvider {
     @Override
     public CompletionStage<ProviderResult<InterpretationDraft>> interpret(InterpretationRequest request) {
         String text = request.question();
+        String parsingText = text;
+        int inquiryMarker = text.indexOf("[STUDENT INQUIRY]");
+        if (inquiryMarker >= 0) {
+            String inquiryPart = text.substring(inquiryMarker + "[STUDENT INQUIRY]".length()).trim();
+            if (!inquiryPart.isEmpty()) {
+                parsingText = inquiryPart;
+            }
+        }
+
         EnumMap<ProjectileProblem.Input, PhysicalQuantity> givens = new EnumMap<>(ProjectileProblem.Input.class);
         List<String> assumptions = new ArrayList<>();
         List<InterpretationDraft.Clarification> clarifications = new ArrayList<>();
 
         // 1. Initial speed
-        Matcher speedMatcher = SPEED_PATTERN.matcher(text);
+        Matcher speedMatcher = SPEED_PATTERN.matcher(parsingText);
         if (speedMatcher.find()) {
             String valStr = speedMatcher.group(1) != null ? speedMatcher.group(1) : speedMatcher.group(2);
             givens.put(ProjectileProblem.Input.INITIAL_SPEED,
@@ -59,25 +72,25 @@ public final class LocalAIProvider implements AIProvider {
         }
 
         // 2. Launch angle
-        Matcher angleMatcher = ANGLE_PATTERN.matcher(text);
+        Matcher angleMatcher = ANGLE_PATTERN.matcher(parsingText);
         if (angleMatcher.find()) {
             givens.put(ProjectileProblem.Input.LAUNCH_ANGLE,
                     new PhysicalQuantity(Double.parseDouble(angleMatcher.group(1)), PhysicalUnit.DEGREE));
-        } else if (HORIZONTAL_PATTERN.matcher(text).find()) {
+        } else if (HORIZONTAL_PATTERN.matcher(parsingText).find()) {
             givens.put(ProjectileProblem.Input.LAUNCH_ANGLE,
                     new PhysicalQuantity(0.0, PhysicalUnit.DEGREE));
             assumptions.add("Horizontal launch angle is 0 degrees.");
         }
 
         // 3. Gravity
-        Matcher gravityMatcher = GRAVITY_PATTERN.matcher(text);
+        Matcher gravityMatcher = GRAVITY_PATTERN.matcher(parsingText);
         if (gravityMatcher.find()) {
             givens.put(ProjectileProblem.Input.GRAVITY,
                     new PhysicalQuantity(Double.parseDouble(gravityMatcher.group(1)), PhysicalUnit.METRE_PER_SECOND_SQUARED));
         }
 
         // 4. Initial height
-        Matcher towerMatcher = TOWER_HEIGHT_PATTERN.matcher(text);
+        Matcher towerMatcher = TOWER_HEIGHT_PATTERN.matcher(parsingText);
         if (towerMatcher.find()) {
             double h = Double.parseDouble(towerMatcher.group(1));
             givens.put(ProjectileProblem.Input.INITIAL_Y, new PhysicalQuantity(h, PhysicalUnit.METRE));
@@ -90,14 +103,14 @@ public final class LocalAIProvider implements AIProvider {
         }
 
         // 5. Time parameter if present
-        Matcher timeMatcher = TIME_PARAM_PATTERN.matcher(text);
+        Matcher timeMatcher = TIME_PARAM_PATTERN.matcher(parsingText);
         if (timeMatcher.find()) {
             givens.put(ProjectileProblem.Input.TIME,
                     new PhysicalQuantity(Double.parseDouble(timeMatcher.group(1)), PhysicalUnit.SECOND));
         }
 
         // 6. Horizontal displacement parameter if present
-        Matcher dispMatcher = HORIZ_DISP_PATTERN.matcher(text);
+        Matcher dispMatcher = HORIZ_DISP_PATTERN.matcher(parsingText);
         if (dispMatcher.find()) {
             givens.put(ProjectileProblem.Input.HORIZONTAL_DISPLACEMENT,
                     new PhysicalQuantity(Double.parseDouble(dispMatcher.group(1)), PhysicalUnit.METRE));
@@ -129,7 +142,7 @@ public final class LocalAIProvider implements AIProvider {
 
         // 9. Identify targets requested
         List<InterpretationDraft.ProblemPart> parts = new ArrayList<>();
-        String lower = text.toLowerCase(Locale.ROOT);
+        String lower = parsingText.toLowerCase(Locale.ROOT);
 
         if (lower.contains("max") && (lower.contains("height") || lower.contains("peak"))) {
             parts.add(new InterpretationDraft.ProblemPart(ProjectileProblem.Target.MAXIMUM_HEIGHT, givens, Map.of()));
@@ -163,6 +176,7 @@ public final class LocalAIProvider implements AIProvider {
 
         assumptions.add("Motion treated as 2D point particle under uniform downward gravity.");
         assumptions.add("Air resistance is neglected.");
+        assumptions.add("no-air-resistance");
 
         InterpretationDraft draft = new InterpretationDraft(text, parts, assumptions, clarifications, 0.98);
         ProviderResult<InterpretationDraft> result = new ProviderResult<>(

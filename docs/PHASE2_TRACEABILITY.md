@@ -8,7 +8,7 @@ Phase 2 added a bounded AI-assisted workflow for text-only projectile questions 
 
 Phase 2 automated tests cover contracts, provider routing, validation, verification, workflow orchestration, and JavaFX UI integration. The Phase 2 test classes contain **124 tests** (approximate; some cross-cut with Phase 1 solver logic).
 
-Phase 2 was implemented and verified within a project that has grown to **367 total tests** across all phases. The 367-test figure is the current repository-wide baseline (verified on `feature/physora-48hr-demo` at commit `f112909`, 2026-11-15, via `.\mvnw.cmd test`). It includes Phase 1 projectile model tests, Phase 2 AI workflow tests, and Phase 3 multi-body simulation engine tests. The 367-test count is not a Phase 2 metric; it reflects the entire project.
+Phase 2 was implemented and verified within a project that has grown to **602 total tests** across all phases (`.\mvnw.cmd test`, all passing with 0 failures, 0 errors, 0 skipped). It includes Phase 1 kinematics models and UI integration tests, Phase 2 AI workflow and regression tests, Phase 2A/2B Relative Motion workbenches, and Phase 3 multi-body simulation engine tests.
 
 End-to-end live runtime verification on a Windows desktop (`.\\mvnw.cmd javafx:run`, live Gemini API with network access, live Ollama + Qwen, and live fallback scenarios) remains **Pending (Stage 3D Gates 2–4)** and is labeled honestly below.
 

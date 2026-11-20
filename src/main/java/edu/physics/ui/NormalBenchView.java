@@ -30,6 +30,8 @@ import java.util.OptionalDouble;
 final class NormalBenchView extends BorderPane {
     private final ProjectileSimulationController controller;
     private final ProjectileSimulationView simulationView;
+    private final PredictionView predictionView;
+    private final ComparisonView comparisonView;
     private final ProjectileLogicView logicView;
     private final AIProblemView aiProblemView;
     private final StackPane viewStack;
@@ -39,7 +41,6 @@ final class NormalBenchView extends BorderPane {
     private final Label flightOutput = outputValue();
     private final Label rangeOutput = outputValue();
     private final Label clockOutput = new Label("t = 0.00 s");
-    private final Map<TextField, javafx.beans.property.DoubleProperty> numericControls = new IdentityHashMap<>();
     private boolean updatingTimeSlider;
     private Node simulationFooter;
 
@@ -52,16 +53,28 @@ final class NormalBenchView extends BorderPane {
         rangeOutput.setId("rangeOutput");
         clockOutput.setId("clockOutput");
         simulationView = new ProjectileSimulationView(controller);
+        predictionView = new PredictionView(controller);
+        comparisonView = new ComparisonView(controller);
         logicView = new ProjectileLogicView(controller);
         aiProblemView = new AIProblemView();
+        aiProblemView.setExperimentSnapshotSupplier(() ->
+                ExperimentSnapshot.fromController(controller, "01 · KINEMATICS", "Ideal Projectile Motion"));
         logicView.setId("logicView");
-        viewStack = new StackPane(simulationView, logicView, aiProblemView);
+        viewStack = new StackPane(simulationView, predictionView, comparisonView, logicView, aiProblemView);
+        predictionView.setVisible(false);
+        predictionView.setManaged(false);
+        comparisonView.setVisible(false);
+        comparisonView.setManaged(false);
         logicView.setVisible(false);
         logicView.setManaged(false);
         aiProblemView.setVisible(false);
         aiProblemView.setManaged(false);
 
         getStyleClass().add("bench-view");
+        var stylesheet = getClass().getResource("/edu/physics/ui/physora.css");
+        if (stylesheet != null) {
+            getStylesheets().add(stylesheet.toExternalForm());
+        }
         setTop(buildTop());
         HBox workArea = new HBox(20, buildViews(), buildInspector());
         workArea.setPadding(new Insets(0, 24, 8, 24));
@@ -71,128 +84,162 @@ final class NormalBenchView extends BorderPane {
 
         controller.modelProperty().addListener((obs, oldModel, newModel) -> refreshOutputs());
         controller.simulationTimeProperty().addListener((obs, oldTime, newTime) -> refreshOutputs());
-        controller.launchSpeedProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
-        controller.launchAngleProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
-        controller.gravityProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
-        controller.initialXProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
-        controller.initialYProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
-        controller.landingYProperty().addListener((obs, oldValue, newValue) -> refreshOutputs());
+        controller.launchSpeedProperty().addListener((obs, oldValue, newValue) -> {
+            refreshOutputs();
+            aiProblemView.notifySimulationParametersChanged();
+        });
+        controller.launchAngleProperty().addListener((obs, oldValue, newValue) -> {
+            refreshOutputs();
+            aiProblemView.notifySimulationParametersChanged();
+        });
+        controller.gravityProperty().addListener((obs, oldValue, newValue) -> {
+            refreshOutputs();
+            aiProblemView.notifySimulationParametersChanged();
+        });
+        controller.initialXProperty().addListener((obs, oldValue, newValue) -> {
+            refreshOutputs();
+            aiProblemView.notifySimulationParametersChanged();
+        });
+        controller.initialYProperty().addListener((obs, oldValue, newValue) -> {
+            refreshOutputs();
+            aiProblemView.notifySimulationParametersChanged();
+        });
+        controller.landingYProperty().addListener((obs, oldValue, newValue) -> {
+            refreshOutputs();
+            aiProblemView.notifySimulationParametersChanged();
+        });
         refreshOutputs();
     }
 
     private VBox buildTop() {
-        HBox masthead = new HBox(10,
-                eyebrow("NORMAL BENCH"), rule(),
-                muted("01   /   KINEMATICS"), spacer(), muted("MODEL 01   ·   IDEAL PROJECTILE"));
-        masthead.setAlignment(Pos.CENTER_LEFT);
-        masthead.setPadding(new Insets(4, 26, 4, 28));
-        masthead.setStyle("-fx-border-color: transparent transparent #cbc4b4 transparent;");
-
-        HBox hero = new HBox(22);
-        hero.setAlignment(Pos.CENTER_LEFT);
-        hero.setPadding(new Insets(4, 28, 4, 28));
-        hero.setStyle("-fx-background-color: #e9e2d0;");
-
-        Label chapter = new Label("01");
-        chapter.setFont(Font.font("Georgia", FontWeight.BOLD, 42));
-        chapter.setTextFill(PhysoraTheme.COBALT);
-        Label vertical = new Label("KINEMATICS");
-        vertical.getStyleClass().add("hero-kicker");
-        VBox number = new VBox(-6, chapter, vertical);
-        number.setAlignment(Pos.CENTER_LEFT);
-
-        VBox titleBlock = new VBox(5,
-                eyebrow("PROJECTILE MOTION   /   CONSTANT GRAVITY"),
-                new Label("Motion is written\nin vectors."),
-                muted("Change the launch. Read the path. Follow the model."));
-        titleBlock.getChildren().get(1).getStyleClass().add("hero-title");
+        Label mark = eyebrow("PHYSORA CHAPTER 01 / KINEMATICS");
+        mark.getStyleClass().add("hero-kicker");
+        Label title = new Label("IDEAL PROJECTILE MOTION");
+        title.setFont(Font.font("Georgia", FontWeight.BOLD, 20));
+        title.setTextFill(PhysoraTheme.INK);
+        Label subtitle = muted("Constant Downward Gravity · 2D Motion in Vectors");
+        VBox titleBlock = new VBox(2, mark, title, subtitle);
         HBox.setHgrow(titleBlock, Priority.ALWAYS);
 
-        VBox notation = new VBox(7,
-                eyebrow("INITIAL VELOCITY"),
-                notation("v0 = (vx0, vy0)"),
-                muted("horizontal  /  vertical"));
-        notation.getStyleClass().add("hero-notation");
-        notation.setAlignment(Pos.CENTER_LEFT);
-        hero.getChildren().addAll(number, rule(), titleBlock, notation);
-
         HBox viewBar = buildViewBar();
-        VBox top = new VBox(masthead, hero, viewBar);
-        return top;
+        HBox topBar = new HBox(16, titleBlock, viewBar);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+        topBar.setPadding(new Insets(10, 24, 10, 24));
+        topBar.setStyle("-fx-border-color: transparent transparent #cbc4b4 transparent; -fx-background-color: #f5f1e5;");
+        return new VBox(topBar);
     }
 
     private HBox buildViewBar() {
         ToggleGroup group = new ToggleGroup();
-        ToggleButton simulationTab = new ToggleButton("SIMULATION VIEW");
-        ToggleButton logicTab = new ToggleButton("LOGIC VIEW");
-        ToggleButton aiTab = new ToggleButton("AI PROBLEM");
+        ToggleButton simulationTab = new ToggleButton("⚗  EXPERIMENT");
+        ToggleButton predictTab = new ToggleButton("🎯  PREDICT");
+        ToggleButton compareTab = new ToggleButton("⚖  COMPARE");
+        ToggleButton logicTab = new ToggleButton("📐  UNDERSTAND");
+        ToggleButton aiTab = new ToggleButton("✦  ASK AI");
+
         simulationTab.setId("simulationViewTab");
+        predictTab.setId("predictTab");
+        compareTab.setId("compareTab");
         logicTab.setId("logicViewTab");
         aiTab.setId("aiProblemTab");
+
         simulationTab.setToggleGroup(group);
+        predictTab.setToggleGroup(group);
+        compareTab.setToggleGroup(group);
         logicTab.setToggleGroup(group);
         aiTab.setToggleGroup(group);
+
         simulationTab.setSelected(true);
-        simulationTab.getStyleClass().add("view-tab");
-        logicTab.getStyleClass().add("view-tab");
-        aiTab.getStyleClass().add("view-tab");
+        simulationTab.getStyleClass().addAll("view-tab", "student-mode-tab");
+        predictTab.getStyleClass().addAll("view-tab", "student-mode-tab");
+        compareTab.getStyleClass().addAll("view-tab", "student-mode-tab");
+        logicTab.getStyleClass().addAll("view-tab", "student-mode-tab");
+        aiTab.getStyleClass().addAll("view-tab", "student-mode-tab");
+
         simulationTab.setOnAction(event -> showView(ActiveView.SIMULATION));
+        predictTab.setOnAction(event -> showView(ActiveView.PREDICT));
+        compareTab.setOnAction(event -> showView(ActiveView.COMPARE));
         logicTab.setOnAction(event -> showView(ActiveView.LOGIC));
         aiTab.setOnAction(event -> showView(ActiveView.AI));
 
-        Label mode = eyebrow("SIMULATE   /   INSPECT   /   ASK");
-        HBox bar = new HBox(0, simulationTab, logicTab, aiTab, spacer(), mode);
-        bar.setAlignment(Pos.CENTER_LEFT);
-        bar.setPadding(new Insets(0, 26, 0, 28));
-        bar.setStyle("-fx-border-color: transparent transparent #cbc4b4 transparent;");
+        HBox bar = new HBox(4, simulationTab, predictTab, compareTab, logicTab, aiTab);
+        bar.setAlignment(Pos.CENTER_RIGHT);
         return bar;
     }
 
     private Node buildViews() {
         viewStack.getStyleClass().add("workspace-stage");
         HBox.setHgrow(viewStack, Priority.ALWAYS);
-        viewStack.setMinWidth(480);
+        viewStack.setMinWidth(400);
         return viewStack;
     }
 
     private Node buildInspector() {
-        VBox inspector = new VBox(19);
-        inspector.setPadding(new Insets(20, 18, 18, 18));
+        VBox inspector = new VBox(8);
+        inspector.setPadding(new Insets(10, 10, 10, 10));
         inspector.getStyleClass().add("model-inspector");
 
         Label heading = eyebrow("MODEL INSPECTOR");
+        heading.getStyleClass().add("inspector-heading");
         Label subheading = new Label("Initial conditions");
         subheading.getStyleClass().add("inspector-title");
-        VBox intro = new VBox(5, heading, subheading);
+        VBox intro = new VBox(2, heading, subheading);
 
-        Slider speed = parameterSlider(0, 50, 20, 1);
-        Slider angle = parameterSlider(0, 90, 45, 1);
-        Slider gravity = parameterSlider(0, 20, 9.81, 0.1);
-        speed.setId("launchSpeedSlider");
-        angle.setId("launchAngleSlider");
-        gravity.setId("gravitySlider");
-        speed.valueProperty().bindBidirectional(controller.launchSpeedProperty());
-        angle.valueProperty().bindBidirectional(controller.launchAngleProperty());
-        gravity.valueProperty().bindBidirectional(controller.gravityProperty());
+        NumericParameterRow speedRow = new NumericParameterRow(
+                "Launch speed (v₀)", "m/s", "launchSpeedInput",
+                controller.launchSpeedProperty().get(), 0.0, 100.0, "%.2f",
+                controller.launchSpeedProperty()::set
+        );
+        NumericParameterRow angleRow = new NumericParameterRow(
+                "Launch angle (θ)", "°", "launchAngleInput",
+                controller.launchAngleProperty().get(), 0.0, 90.0, "%.2f",
+                controller.launchAngleProperty()::set
+        );
+        NumericParameterRow gravityRow = new NumericParameterRow(
+                "Gravity (g)", "m/s²", "gravityInput",
+                controller.gravityProperty().get(), 0.1, 50.0, "%.2f",
+                controller.gravityProperty()::set
+        );
 
-        VBox coordinates = new VBox(10,
+        controller.launchSpeedProperty().addListener((obs, o, n) -> speedRow.setValue(n.doubleValue()));
+        controller.launchAngleProperty().addListener((obs, o, n) -> angleRow.setValue(n.doubleValue()));
+        controller.gravityProperty().addListener((obs, o, n) -> gravityRow.setValue(n.doubleValue()));
+
+        NumericParameterRow initXRow = new NumericParameterRow(
+                "Initial position (x₀)", "m", "initialXInput",
+                controller.initialXProperty().get(), -500.0, 500.0, "%.2f",
+                controller.initialXProperty()::set
+        );
+        NumericParameterRow initYRow = new NumericParameterRow(
+                "Initial elevation (y₀)", "m", "initialYInput",
+                controller.initialYProperty().get(), 0.0, 500.0, "%.2f",
+                controller.initialYProperty()::set
+        );
+        NumericParameterRow landingYRow = new NumericParameterRow(
+                "Landing boundary (y_land)", "m", "landingYInput",
+                controller.landingYProperty().get(), -500.0, 500.0, "%.2f",
+                controller.landingYProperty()::set
+        );
+
+        controller.initialXProperty().addListener((obs, o, n) -> initXRow.setValue(n.doubleValue()));
+        controller.initialYProperty().addListener((obs, o, n) -> initYRow.setValue(n.doubleValue()));
+        controller.landingYProperty().addListener((obs, o, n) -> landingYRow.setValue(n.doubleValue()));
+
+        VBox inputs = new VBox(6,
+                eyebrow("LAUNCH PARAMETERS"),
+                speedRow, angleRow, gravityRow);
+        inputs.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8 10 8 10;");
+
+        VBox coordinates = new VBox(6,
                 eyebrow("LAUNCH AND LANDING"),
-                numericInput("Initial x", "m", "initialXInput", controller.initialXProperty()),
-                numericInput("Initial y", "m", "initialYInput", controller.initialYProperty()),
-                numericInput("Landing height", "m", "landingYInput", controller.landingYProperty()));
+                initXRow, initYRow, landingYRow);
+        coordinates.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8 10 8 10;");
 
-        VBox inputs = new VBox(20,
-                parameter("Launch speed", "m/s", speed, controller.launchSpeedProperty()),
-                parameter("Launch angle", "°", angle, controller.launchAngleProperty()),
-                parameter("Gravity", "m/s²", gravity, controller.gravityProperty()));
-
-        Node separator = separator();
         Label assumptionsTitle = eyebrow("MODEL ASSUMPTIONS");
         Label assumptions = new Label();
         assumptions.setId("assumptionsOutput");
         refreshAssumptions(assumptions);
         assumptions.getStyleClass().add("assumption-copy");
-        VBox assumptionsBlock = new VBox(9, assumptionsTitle, assumptions);
         controller.modelProperty().addListener((obs, oldModel, newModel) -> refreshAssumptions(assumptions));
 
         Label vectorTitle = eyebrow("SIMULATION OVERLAY");
@@ -201,89 +248,49 @@ final class NormalBenchView extends BorderPane {
         vectors.getStyleClass().add("vector-toggle");
         vectors.selectedProperty().addListener((obs, oldValue, newValue) ->
                 simulationView.setShowVelocityComponents(newValue));
-        VBox overlayBlock = new VBox(8, vectorTitle, vectors);
 
-        inspector.getChildren().addAll(intro, separator, inputs, separator(), coordinates, separator(), assumptionsBlock,
-                separator(), overlayBlock);
+        VBox overlayBlock = new VBox(6, assumptionsTitle, assumptions, separator(), vectorTitle, vectors);
+        overlayBlock.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8 10 8 10;");
+
+        Button restoreDefaults = new Button("↺  RESTORE DEFAULTS");
+        restoreDefaults.setId("restoreDefaultsButton");
+        restoreDefaults.getStyleClass().add("transport-secondary");
+        restoreDefaults.setMaxWidth(Double.MAX_VALUE);
+        restoreDefaults.setStyle("-fx-font-size: 11px; -fx-padding: 7 12 7 12; -fx-font-weight: bold;");
+        restoreDefaults.setOnAction(event -> {
+            controller.restoreDefaults();
+            speedRow.setValue(controller.launchSpeedProperty().get());
+            angleRow.setValue(controller.launchAngleProperty().get());
+            gravityRow.setValue(controller.gravityProperty().get());
+            initXRow.setValue(controller.initialXProperty().get());
+            initYRow.setValue(controller.initialYProperty().get());
+            landingYRow.setValue(controller.landingYProperty().get());
+        });
+        VBox defaultsBlock = new VBox(6, eyebrow("EXPERIMENT RESET"), restoreDefaults);
+        defaultsBlock.setStyle("-fx-background-color: #fcfbf7; -fx-border-color: #cbc4b4; -fx-border-radius: 6px; -fx-padding: 8 10 8 10;");
+
+        inspector.getChildren().addAll(intro, inputs, coordinates, overlayBlock, defaultsBlock);
         ScrollPane scroll = new ScrollPane(inspector);
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scroll.setPrefViewportWidth(286);
-        scroll.setMinWidth(260);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroll.setPrefViewportWidth(295);
+        scroll.setMinWidth(280);
         scroll.setMaxHeight(Double.MAX_VALUE);
         scroll.getStyleClass().add("inspector-scroll");
+        scroll.setStyle("-fx-background-color: #f5f1e5; -fx-background: #f5f1e5; -fx-border-color: transparent;");
         return scroll;
-    }
-
-    private VBox numericInput(String name, String unit, String id,
-                              javafx.beans.property.DoubleProperty property) {
-        Label label = new Label(name);
-        label.getStyleClass().add("parameter-name");
-        TextField field = new TextField(formatInput(property.get()));
-        field.setId(id);
-        field.setAccessibleText(name + " in " + unit);
-        field.setPrefColumnCount(8);
-        numericControls.put(field, property);
-        Label unitLabel = new Label(unit);
-        unitLabel.getStyleClass().add("parameter-value");
-        Label error = new Label();
-        error.setId(id + "Error");
-        error.getStyleClass().add("validation-message");
-        error.setVisible(false);
-        error.setManaged(false);
-        field.textProperty().addListener((obs, oldText, text) -> {
-            try {
-                if (text == null || text.isBlank()) throw new NumberFormatException();
-                double value = Double.parseDouble(text.trim());
-                if (!Double.isFinite(value)) throw new NumberFormatException();
-                property.set(value);
-                field.getStyleClass().remove("input-invalid");
-                error.setText("");
-                error.setVisible(false);
-                error.setManaged(false);
-            } catch (NumberFormatException ex) {
-                if (!field.getStyleClass().contains("input-invalid")) field.getStyleClass().add("input-invalid");
-                error.setText("Enter a finite number.");
-                error.setVisible(true);
-                error.setManaged(true);
-            }
-        });
-        property.addListener((obs, oldValue, newValue) -> {
-            if (!field.isFocused()) field.setText(formatInput(newValue.doubleValue()));
-        });
-        return new VBox(5, label, new HBox(8, field, unitLabel), error);
     }
 
     private void refreshAssumptions(Label assumptions) {
         ProjectileMotion model = controller.model();
         assumptions.setText(String.format(Locale.ROOT,
-                "2D motion\nConstant downward gravity\nAir resistance ignored\nLaunch (%.2f, %.2f) m\nLanding surface y = %.2f m",
-                model.initialX(), model.initialY(), model.landingY()));
+                "2D motion\nConstant downward gravity (g = %.2f m/s²)\nAir resistance ignored\nLaunch (%.2f, %.2f) m\nLanding surface y = %.2f m",
+                model.gravity(), model.initialX(), model.initialY(), model.landingY()));
     }
 
     private static String formatInput(double value) {
         return String.format(Locale.ROOT, "%.2f", value);
-    }
-
-    private VBox parameter(String name, String unit, Slider slider, javafx.beans.property.DoubleProperty property) {
-        Label label = new Label(name);
-        label.getStyleClass().add("parameter-name");
-        Label value = new Label();
-        value.getStyleClass().add("parameter-value");
-        ChangeListener<Number> update = (obs, oldValue, newValue) ->
-                value.setText(String.format(Locale.ROOT, "%.2f  %s", newValue.doubleValue(), unit));
-        property.addListener(update);
-        update.changed(null, property.get(), property.get());
-        VBox item = new VBox(8, new HBoxWithTrailing(name, label, value), slider);
-        return item;
-    }
-
-    private static final class HBoxWithTrailing extends HBox {
-        HBoxWithTrailing(String name, Node left, Node right) {
-            super(8, left, spacer(), right);
-            setAlignment(Pos.CENTER_LEFT);
-            HBox.setHgrow(getChildren().get(1), Priority.ALWAYS);
-        }
     }
 
     private VBox buildFooter() {
@@ -300,19 +307,16 @@ final class NormalBenchView extends BorderPane {
 
         Button play = new Button("▶  PLAY");
         Button pause = new Button("Ⅱ  PAUSE");
-        Button reset = new Button("↺  RESET");
+        Button restart = new Button("↺  RESTART");
         play.getStyleClass().add("transport-primary");
         pause.getStyleClass().add("transport-secondary");
-        reset.getStyleClass().add("transport-secondary");
+        restart.getStyleClass().add("transport-secondary");
         play.setId("playButton");
         pause.setId("pauseButton");
-        reset.setId("resetButton");
+        restart.setId("resetButton");
         play.setOnAction(event -> controller.play());
         pause.setOnAction(event -> controller.pause());
-        reset.setOnAction(event -> {
-            controller.reset();
-            numericControls.forEach((field, property) -> field.setText(formatInput(property.get())));
-        });
+        restart.setOnAction(event -> controller.restartAnimation());
         updatePlayability(play);
         controller.playingProperty().addListener((obs, oldValue, newValue) -> updatePlayability(play));
         controller.modelProperty().addListener((obs, oldValue, newValue) -> updatePlayability(play));
@@ -344,7 +348,15 @@ final class NormalBenchView extends BorderPane {
                 speedText.setText(String.format(Locale.ROOT, "%.2f×", newValue.doubleValue())));
 
         clockOutput.getStyleClass().add("transport-time");
-        HBox transport = new HBox(12, play, pause, reset, timeline, clockOutput,
+        Label transportStatus = new Label(controller.status().label());
+        transportStatus.setId("transportStatusBadge");
+        applyTransportStatusStyle(transportStatus, controller.status());
+        controller.statusProperty().addListener((obs, oldValue, newValue) -> {
+            transportStatus.setText(newValue.label());
+            applyTransportStatusStyle(transportStatus, newValue);
+        });
+
+        HBox transport = new HBox(12, play, pause, restart, timeline, clockOutput, transportStatus,
                 eyebrow("RATE"), playback, speedText);
         transport.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(timeline, Priority.ALWAYS);
@@ -357,6 +369,19 @@ final class NormalBenchView extends BorderPane {
         return footer;
     }
 
+    private static void applyTransportStatusStyle(Label badge, ProjectileSimulationController.SimulationStatus status) {
+        badge.setText(status.label());
+        badge.getStyleClass().removeAll("status-badge", "status-ready", "status-playing", "status-paused", "status-apex", "status-landed");
+        badge.getStyleClass().add("status-badge");
+        switch (status) {
+            case READY -> badge.getStyleClass().add("status-ready");
+            case PLAYING -> badge.getStyleClass().add("status-playing");
+            case PAUSED -> badge.getStyleClass().add("status-paused");
+            case AT_APEX -> badge.getStyleClass().add("status-apex");
+            case LANDED -> badge.getStyleClass().add("status-landed");
+        }
+    }
+
     private void updatePlayability(Button play) {
         OptionalDouble flightTime = controller.model().timeOfFlight();
         boolean immediateLanding = flightTime.isPresent() && flightTime.getAsDouble() <= 0.0;
@@ -367,7 +392,7 @@ final class NormalBenchView extends BorderPane {
         ProjectileMotion model = controller.model();
         ProjectileMotion.State state = model.stateAt(controller.simulationTimeProperty().get());
         positionOutput.setText(String.format(Locale.ROOT, "x %.2f m   /   y %.2f m", state.x(), state.y()));
-        velocityOutput.setText(String.format(Locale.ROOT, "vx %.2f   /   vy %.2f m/s", state.vx(), state.vy()));
+        velocityOutput.setText(String.format(Locale.ROOT, "vₓ %.2f m/s   /   vᵧ %.2f m/s", state.vx(), state.vy()));
         peakOutput.setText(optional(model.maximumHeight(), "m", "unbounded"));
         flightOutput.setText(optional(model.timeOfFlight(), "s", "no landing"));
         rangeOutput.setText(optional(model.horizontalRange(), "m", "no landing"));
@@ -375,35 +400,42 @@ final class NormalBenchView extends BorderPane {
 
     private void showView(ActiveView activeView) {
         boolean simulation = activeView == ActiveView.SIMULATION;
+        boolean predict = activeView == ActiveView.PREDICT;
+        boolean compare = activeView == ActiveView.COMPARE;
         boolean logic = activeView == ActiveView.LOGIC;
         boolean ai = activeView == ActiveView.AI;
+
         simulationView.setVisible(simulation);
         simulationView.setManaged(simulation);
+        predictionView.setVisible(predict);
+        predictionView.setManaged(predict);
+        comparisonView.setVisible(compare);
+        comparisonView.setManaged(compare);
         logicView.setVisible(logic);
         logicView.setManaged(logic);
         aiProblemView.setVisible(ai);
         aiProblemView.setManaged(ai);
+
         setBottom(ai ? null : simulationFooter);
     }
 
     void dispose() { aiProblemView.dispose(); }
 
-    private enum ActiveView { SIMULATION, LOGIC, AI }
+    AIProblemView aiProblemView() { return aiProblemView; }
+    ProjectileLogicView logicView() { return logicView; }
+    ProjectileSimulationView simulationView() { return simulationView; }
+    PredictionView predictionView() { return predictionView; }
+    ComparisonView comparisonView() { return comparisonView; }
+
+    private enum ActiveView { SIMULATION, PREDICT, COMPARE, LOGIC, AI }
 
     private static VBox result(String title, Label value) {
         Label caption = eyebrow(title);
-        VBox box = new VBox(5, caption, value);
+        caption.setFont(Font.font("Segoe UI", FontWeight.BOLD, 9.5));
+        caption.setStyle("-fx-text-fill: #475569;");
+        VBox box = new VBox(3, caption, value);
         box.getStyleClass().add("result-cell");
         return box;
-    }
-
-    private static Slider parameterSlider(double min, double max, double value, double increment) {
-        Slider slider = new Slider(min, max, value);
-        slider.setBlockIncrement(increment);
-        slider.setMajorTickUnit((max - min) / 3.0);
-        slider.setMaxWidth(Double.MAX_VALUE);
-        slider.getStyleClass().add("parameter-slider");
-        return slider;
     }
 
     private static Label eyebrow(String text) {
@@ -427,6 +459,8 @@ final class NormalBenchView extends BorderPane {
     private static Label outputValue() {
         Label label = new Label("—");
         label.getStyleClass().add("result-value");
+        label.setFont(Font.font("Consolas", FontWeight.BOLD, 13.5));
+        label.setStyle("-fx-text-fill: #0f172a;");
         return label;
     }
 

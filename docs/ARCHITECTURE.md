@@ -2,11 +2,26 @@
 
 This document records the implementation that exists today. Product context and longer-term direction remain in `PROJECT_CONTEXT.md` and `PROJECT_GOAL.md`.
 
-Verification baseline: **367 tests**, `.\mvnw.cmd test`, all passing. Recorded on `feature/physora-48hr-demo` at commit `f112909` (2026-11-15).
+Verification baseline: **602 tests**, `.\mvnw.cmd test`, all passing. Zero failures, zero errors, build successful.
 
 ## Application entry point and shell
 
-`ProjectileSimulatorApp` is the JavaFX `Application` entry point. It creates a `PhysoraApplicationShell`, which owns the chapter rail and the Normal Bench workspace. The chapter rail (`ChapterRail`) is a vertical sidebar listing available physics chapters; currently only "Projectile Motion" is active.
+`ProjectileSimulatorApp` is the JavaFX `Application` entry point. It creates a `PhysoraApplicationShell`, which owns the chapter rail (`ChapterRail`), the Kinematics normal bench workspace (`NormalBenchView`), and the planned/relative chapter view (`PlannedChapterView`).
+
+The curriculum sequence includes eight chapters:
+- **01 Kinematics** — LIVE (5 modes: Experiment, Predict, Compare, Understand, Ask AI)
+- **02 Relative Motion** — LIVE (4 workbenches: Two-Projectile Pursuit, River-Boat Crossing, Rain-Man Umbrella, Inverse Rain Investigator)
+- **03–08** — PLANNED curriculum roadmaps
+
+The shell enforces reciprocal lifecycle pausing: switching between Chapter 01 and Chapter 02 automatically pauses active simulations in both directions.
+
+## Presentation & Mathematical Typography
+
+Student-facing views format equations and physical quantities via a unified mathematical presentation architecture:
+* **`MathView` (JavaFX Component):** Leverages `TextFlow` with custom vertical baseline translations (`setTranslateY`) to render authentic subscripts, superscripts, stacked two-line equation systems ($x(t) = x_0 + v_{x0}t$, $y(t) = y_0 + v_{y0}t - \frac{1}{2}gt^2$), and structured two-column aligned substitutions without raw keys.
+* **`MathTypography` (Text Formatting):** Converts abstract expression trees and programming tokens into clean Unicode mathematical notation ($x_0, y_0, v_{x0}, v_{y0}, v_x, v_y, v_{rx}, v_{ry}, v_m, v_d, \theta, \phi, \Delta\phi, \kappa, \kappa_{\text{down}}$, $\text{m/s}^2$) with ZERO raw curly braces (`{}`) or LaTeX delimiters leaking into labels.
+
+Centralized physical constants are defined in `PhysicsConstants`, maintaining explicit separation between SI gravity ($9.81\text{ m/s}^2$) and textbook/JEE examination preset gravity ($9.80\text{ m/s}^2$).
 
 ## Normal Bench workflow
 

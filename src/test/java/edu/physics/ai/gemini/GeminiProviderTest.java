@@ -3,6 +3,8 @@ package edu.physics.ai.gemini;
 import edu.physics.ai.AIProviderException;
 import edu.physics.ai.ExplanationRequest;
 import edu.physics.ai.InterpretationRequest;
+import edu.physics.ai.ProblemValidationResult;
+import edu.physics.ai.ProblemValidator;
 import edu.physics.ai.ProviderResult;
 import edu.physics.problem.PhysicalQuantity;
 import edu.physics.problem.PhysicalUnit;
@@ -11,6 +13,8 @@ import edu.physics.problem.ProjectileProblemSequence;
 import edu.physics.problem.ProjectileProblemSolver;
 import edu.physics.problem.ProjectileSequenceSolution;
 import edu.physics.problem.ProjectileSolution;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -144,6 +148,128 @@ class GeminiProviderTest {
         assertThrows(AIProviderException.class, () -> GeminiProviderFactory.createFromEnvironment(Map.of()));
         assertThrows(IllegalArgumentException.class, () -> GeminiProviderConfiguration.fromEnvironment(
                 Map.of("PHYSORA_AI_MAX_ATTEMPTS", "99")));
+    }
+
+    @Nested
+    @DisplayName("Zero-Value Length Unit Coercion Regression")
+    class ZeroValueUnitCoercionRegression {
+        private final ProblemValidator validator = new ProblemValidator();
+
+        private GeminiProvider providerWithGiven(String input, double value, String unit) {
+            String json = String.format("""
+                    {"normalizedQuestion":"Max height query","parts":[{"target":"MAXIMUM_HEIGHT","givens":[
+                      {"input":"INITIAL_SPEED","value":20,"unit":"METRE_PER_SECOND"},
+                      {"input":"LAUNCH_ANGLE","value":30,"unit":"DEGREE"},
+                      {"input":"GRAVITY","value":10,"unit":"METRE_PER_SECOND_SQUARED"},
+                      {"input":"%s","value":%s,"unit":"%s"}],"references":[]}],
+                     "assumptions":["2D point-particle under gravity"],"clarifications":[],"confidence":0.95}
+                    """, input, value, unit);
+            var transport = new FakeTransport(CompletableFuture.completedFuture(
+                    new GeminiTransport.Response(json, "req-audit", "test-model", null)));
+            return new GeminiProvider(transport, CONFIG);
+        }
+
+        @Test
+        @DisplayName("1. Inferred INITIAL_Y = 0 with unit ONE is normalized to METRE and accepted")
+        void inferredInitialYDimensionlessOneAccepted() {
+            var provider = providerWithGiven("INITIAL_Y", 0.0, "ONE");
+            var draft = provider.interpret(new InterpretationRequest("kick ball")).toCompletableFuture().join().content();
+            PhysicalQuantity q = draft.parts().get(0).givens().get(ProjectileProblem.Input.INITIAL_Y);
+            assertEquals(0.0, q.value(), 1e-9);
+            assertEquals(PhysicalUnit.METRE, q.unit(), "Dimensionless ONE should be normalized to METRE");
+
+            ProblemValidationResult result = validator.validate("kick ball", draft);
+            assertEquals(ProblemValidationResult.Status.READY, result.status(),
+                    "Inferred ground launch must be READY; errors: " + result.errors());
+        }
+
+        @Test
+        @DisplayName("2. Incompatible INITIAL_Y = 0 with unit SECOND is rejected")
+        void explicitInitialYZeroSecondRejected() {
+            var provider = providerWithGiven("INITIAL_Y", 0.0, "SECOND");
+            var draft = provider.interpret(new InterpretationRequest("kick ball")).toCompletableFuture().join().content();
+            PhysicalQuantity q = draft.parts().get(0).givens().get(ProjectileProblem.Input.INITIAL_Y);
+            assertEquals(0.0, q.value(), 1e-9);
+            assertEquals(PhysicalUnit.SECOND, q.unit(), "SECOND must NOT be coerced to METRE");
+
+            ProblemValidationResult result = validator.validate("kick ball", draft);
+            assertEquals(ProblemValidationResult.Status.INVALID, result.status());
+            assertTrue(result.errors().stream().anyMatch(e -> e.contains("incompatible-unit:INITIAL_Y")),
+                    "Must flag incompatible unit for INITIAL_Y; got: " + result.errors());
+        }
+
+        @Test
+        @DisplayName("3. Incompatible non-zero INITIAL_Y = 5 with unit SECOND is rejected")
+        void explicitInitialYNonZeroSecondRejected() {
+            var provider = providerWithGiven("INITIAL_Y", 5.0, "SECOND");
+            var draft = provider.interpret(new InterpretationRequest("kick ball")).toCompletableFuture().join().content();
+            PhysicalQuantity q = draft.parts().get(0).givens().get(ProjectileProblem.Input.INITIAL_Y);
+            assertEquals(5.0, q.value(), 1e-9);
+            assertEquals(PhysicalUnit.SECOND, q.unit(), "SECOND must NOT be coerced to METRE");
+
+            ProblemValidationResult result = validator.validate("kick ball", draft);
+            assertEquals(ProblemValidationResult.Status.INVALID, result.status());
+            assertTrue(result.errors().stream().anyMatch(e -> e.contains("incompatible-unit:INITIAL_Y")),
+                    "Must flag incompatible unit for non-zero INITIAL_Y; got: " + result.errors());
+        }
+
+        @Test
+        @DisplayName("4. Inferred LANDING_Y = 0 with unit ONE is normalized to METRE and accepted")
+        void inferredLandingYDimensionlessOneAccepted() {
+            var provider = providerWithGiven("LANDING_Y", 0.0, "ONE");
+            var draft = provider.interpret(new InterpretationRequest("kick ball")).toCompletableFuture().join().content();
+            PhysicalQuantity q = draft.parts().get(0).givens().get(ProjectileProblem.Input.LANDING_Y);
+            assertEquals(0.0, q.value(), 1e-9);
+            assertEquals(PhysicalUnit.METRE, q.unit(), "Dimensionless ONE should be normalized to METRE");
+
+            ProblemValidationResult result = validator.validate("kick ball", draft);
+            assertEquals(ProblemValidationResult.Status.READY, result.status(),
+                    "Inferred level ground landing must be READY; errors: " + result.errors());
+        }
+
+        @Test
+        @DisplayName("5. Incompatible LANDING_Y = 0 with unit SECOND is rejected")
+        void explicitLandingYZeroSecondRejected() {
+            var provider = providerWithGiven("LANDING_Y", 0.0, "SECOND");
+            var draft = provider.interpret(new InterpretationRequest("kick ball")).toCompletableFuture().join().content();
+            PhysicalQuantity q = draft.parts().get(0).givens().get(ProjectileProblem.Input.LANDING_Y);
+            assertEquals(0.0, q.value(), 1e-9);
+            assertEquals(PhysicalUnit.SECOND, q.unit(), "SECOND must NOT be coerced to METRE");
+
+            ProblemValidationResult result = validator.validate("kick ball", draft);
+            assertEquals(ProblemValidationResult.Status.INVALID, result.status());
+            assertTrue(result.errors().stream().anyMatch(e -> e.contains("incompatible-unit:LANDING_Y")),
+                    "Must flag incompatible unit for LANDING_Y; got: " + result.errors());
+        }
+
+        @Test
+        @DisplayName("6. Zero-valued incompatible RADIAN input for INITIAL_Y is rejected")
+        void explicitInitialYZeroRadianRejected() {
+            var provider = providerWithGiven("INITIAL_Y", 0.0, "RADIAN");
+            var draft = provider.interpret(new InterpretationRequest("kick ball")).toCompletableFuture().join().content();
+            PhysicalQuantity q = draft.parts().get(0).givens().get(ProjectileProblem.Input.INITIAL_Y);
+            assertEquals(0.0, q.value(), 1e-9);
+            assertEquals(PhysicalUnit.RADIAN, q.unit(), "RADIAN must NOT be coerced to METRE");
+
+            ProblemValidationResult result = validator.validate("kick ball", draft);
+            assertEquals(ProblemValidationResult.Status.INVALID, result.status());
+            assertTrue(result.errors().stream().anyMatch(e -> e.contains("incompatible-unit:INITIAL_Y")),
+                    "Must flag incompatible unit for RADIAN on INITIAL_Y; got: " + result.errors());
+        }
+
+        @Test
+        @DisplayName("7. Correctly dimensioned zero-valued METRE input for INITIAL_Y is preserved and accepted")
+        void correctlyDimensionedZeroMetreAccepted() {
+            var provider = providerWithGiven("INITIAL_Y", 0.0, "METRE");
+            var draft = provider.interpret(new InterpretationRequest("kick ball")).toCompletableFuture().join().content();
+            PhysicalQuantity q = draft.parts().get(0).givens().get(ProjectileProblem.Input.INITIAL_Y);
+            assertEquals(0.0, q.value(), 1e-9);
+            assertEquals(PhysicalUnit.METRE, q.unit(), "METRE must be preserved as METRE");
+
+            ProblemValidationResult result = validator.validate("kick ball", draft);
+            assertEquals(ProblemValidationResult.Status.READY, result.status(),
+                    "Correctly dimensioned 0.0 METRE must be READY; errors: " + result.errors());
+        }
     }
 
     private static AIProviderException.Kind failureKind(GeminiProvider provider) {

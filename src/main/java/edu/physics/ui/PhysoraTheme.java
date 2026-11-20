@@ -11,8 +11,8 @@ final class PhysoraTheme {
     static final Color ORANGE = Color.web("#e56843");
     static final Color MUTED = Color.web("#66707a");
     static final Color RULE = Color.web("#cbc4b4");
-    static final Color CANVAS = Color.web("#f0eddf");
-    static final Color GRID = Color.web("#d9d4c5");
+    static final Color CANVAS = Color.web("#ffffff");
+    static final Color GRID = Color.web("#e5e2d8");
 
     private PhysoraTheme() {}
 }

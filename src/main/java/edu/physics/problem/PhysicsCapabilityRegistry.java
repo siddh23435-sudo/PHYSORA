@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -164,6 +165,84 @@ public final class PhysicsCapabilityRegistry {
     public static final String CAPABILITY_HORIZONTAL_LANDING_SURFACE = "HORIZONTAL_LANDING_SURFACE";
     public static final String CAPABILITY_INCLINED_LANDING_SURFACE = "INCLINED_LANDING_SURFACE";
     public static final String CAPABILITY_INVERSE_PROJECTILE_PARAMETERS = "INVERSE_PROJECTILE_PARAMETERS";
+
+    /** Lifecycle status of a curriculum chapter in the physics learning platform. */
+    public enum ChapterStatus {
+        AVAILABLE,
+        PLANNED
+    }
+
+    /**
+     * Authoritative curriculum descriptor for one physics chapter.
+     * Guaranteed SI-aligned, JEE-focused, and deterministic.
+     */
+    public record ChapterCapability(
+            int number,
+            String id,
+            String title,
+            String description,
+            ChapterStatus status) {
+        public ChapterCapability {
+            if (number < 1) throw new IllegalArgumentException("Chapter number must be >= 1");
+            Objects.requireNonNull(id, "Chapter id is required");
+            Objects.requireNonNull(title, "Chapter title is required");
+            Objects.requireNonNull(description, "Chapter description is required");
+            Objects.requireNonNull(status, "Chapter status is required");
+        }
+
+        public boolean isAvailable() {
+            return status == ChapterStatus.AVAILABLE;
+        }
+
+        public String formattedNumber() {
+            return String.format(Locale.ROOT, "%02d", number);
+        }
+    }
+
+    /**
+     * Exactly eight supported JEE mechanics chapters in approved curriculum order.
+     * Solids and Fluids are explicitly excluded from the platform scope.
+     */
+    private static final List<ChapterCapability> CURRICULUM_CHAPTERS = List.of(
+            new ChapterCapability(1, "kinematics", "Kinematics",
+                    "Two-dimensional projectile motion under constant downward gravity, arbitrary launch angle and elevation.",
+                    ChapterStatus.AVAILABLE),
+            new ChapterCapability(2, "relative-motion", "Relative Motion",
+                    "Inertial reference frames, 1D/2D relative velocity, river-boat crossing and rain-umbrella drift problems.",
+                    ChapterStatus.AVAILABLE),
+            new ChapterCapability(3, "laws-of-motion", "Laws of Motion",
+                    "Newton's laws of motion, free-body diagrams, static & kinetic friction, coupled pulley-block systems.",
+                    ChapterStatus.PLANNED),
+            new ChapterCapability(4, "work-energy", "Work & Energy",
+                    "Work-energy theorem, conservative vs non-conservative forces, potential energy curves, and mechanical power.",
+                    ChapterStatus.PLANNED),
+            new ChapterCapability(5, "momentum-collisions", "Momentum & Collisions",
+                    "Impulse-momentum theorem, conservation of linear momentum, elastic & inelastic collisions in 1D and 2D.",
+                    ChapterStatus.PLANNED),
+            new ChapterCapability(6, "circular-motion", "Circular Motion",
+                    "Uniform & non-uniform circular kinematics, centripetal acceleration, roadway banking, vertical circular loops.",
+                    ChapterStatus.PLANNED),
+            new ChapterCapability(7, "rotation", "Rotation",
+                    "Rigid body dynamics, torque, moment of inertia, parallel/perpendicular axis theorems, rolling without slipping.",
+                    ChapterStatus.PLANNED),
+            new ChapterCapability(8, "oscillations", "Oscillations",
+                    "Simple harmonic motion (SHM), mass-spring systems, simple & physical pendulums, energy exchange in SHM.",
+                    ChapterStatus.PLANNED)
+    );
+
+    /**
+     * Returns the immutable eight-chapter curriculum sequence for the platform.
+     */
+    public static List<ChapterCapability> curriculumChapters() {
+        return CURRICULUM_CHAPTERS;
+    }
+
+    /**
+     * Finds a chapter by its 1-based number.
+     */
+    public static Optional<ChapterCapability> findChapter(int number) {
+        return CURRICULUM_CHAPTERS.stream().filter(c -> c.number() == number).findFirst();
+    }
 
     private static final Map<String, ConstraintKind> KNOWN_CONSTRAINT_ALIASES = buildConstraintAliases();
 
