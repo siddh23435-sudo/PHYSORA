@@ -111,36 +111,75 @@ final class PredictionView extends BorderPane {
                 "-fx-border-color: #cbc4b4; -fx-border-radius: 2px; -fx-background-radius: 2px;");
 
         Label inputTitle = new Label("ENTER YOUR PREDICTIONS");
-        inputTitle.setStyle("-fx-font-family: Georgia; -fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #142e4b;");
+        inputTitle.setStyle("-fx-font-family: Georgia; -fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #000000;");
 
         GridPane grid = new GridPane();
         grid.setHgap(14);
         grid.setVgap(10);
 
         heightCheck.setId("predictMaxHeightCheck");
+        heightCheck.getStyleClass().add("prediction-checkbox");
+        heightCheck.setStyle("-fx-text-fill: #000000; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 1.0;");
+        heightCheck.setTextFill(javafx.scene.paint.Color.BLACK);
         heightCheck.setSelected(true);
+        heightCheck.disabledProperty().addListener((obs, o, n) -> heightCheck.setOpacity(1.0));
+
         heightField.setId("predictMaxHeightField");
+        heightField.getStyleClass().add("prediction-field");
+        heightField.setStyle("-fx-text-fill: #000000; -fx-font-family: 'Consolas'; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 1.0;");
         heightField.setPromptText("e.g. 15.0");
         heightField.setPrefWidth(120);
+        heightField.disabledProperty().addListener((obs, o, n) -> heightField.setOpacity(1.0));
 
         timeCheck.setId("predictFlightTimeCheck");
+        timeCheck.getStyleClass().add("prediction-checkbox");
+        timeCheck.setStyle("-fx-text-fill: #000000; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 1.0;");
+        timeCheck.setTextFill(javafx.scene.paint.Color.BLACK);
         timeCheck.setSelected(true);
+        timeCheck.disabledProperty().addListener((obs, o, n) -> timeCheck.setOpacity(1.0));
+
         timeField.setId("predictFlightTimeField");
+        timeField.getStyleClass().add("prediction-field");
+        timeField.setStyle("-fx-text-fill: #000000; -fx-font-family: 'Consolas'; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 1.0;");
         timeField.setPromptText("e.g. 2.5");
         timeField.setPrefWidth(120);
+        timeField.disabledProperty().addListener((obs, o, n) -> timeField.setOpacity(1.0));
 
         rangeCheck.setId("predictRangeCheck");
+        rangeCheck.getStyleClass().add("prediction-checkbox");
+        rangeCheck.setStyle("-fx-text-fill: #000000; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 1.0;");
+        rangeCheck.setTextFill(javafx.scene.paint.Color.BLACK);
         rangeCheck.setSelected(true);
+        rangeCheck.disabledProperty().addListener((obs, o, n) -> rangeCheck.setOpacity(1.0));
+
         rangeField.setId("predictRangeField");
+        rangeField.getStyleClass().add("prediction-field");
+        rangeField.setStyle("-fx-text-fill: #000000; -fx-font-family: 'Consolas'; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 1.0;");
         rangeField.setPromptText("e.g. 40.0");
         rangeField.setPrefWidth(120);
+        rangeField.disabledProperty().addListener((obs, o, n) -> rangeField.setOpacity(1.0));
+
+        Label unitHeight = new Label("m");
+        unitHeight.getStyleClass().add("prediction-unit-label");
+        unitHeight.setStyle("-fx-text-fill: #000000; -fx-font-family: 'Consolas'; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 1.0;");
+        unitHeight.setTextFill(javafx.scene.paint.Color.BLACK);
+
+        Label unitTime = new Label("s");
+        unitTime.getStyleClass().add("prediction-unit-label");
+        unitTime.setStyle("-fx-text-fill: #000000; -fx-font-family: 'Consolas'; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 1.0;");
+        unitTime.setTextFill(javafx.scene.paint.Color.BLACK);
+
+        Label unitRange = new Label("m");
+        unitRange.getStyleClass().add("prediction-unit-label");
+        unitRange.setStyle("-fx-text-fill: #000000; -fx-font-family: 'Consolas'; -fx-font-size: 12px; -fx-font-weight: bold; -fx-opacity: 1.0;");
+        unitRange.setTextFill(javafx.scene.paint.Color.BLACK);
 
         grid.add(heightCheck, 0, 0);
-        grid.add(new HBox(6, heightField, new Label("m")), 1, 0);
+        grid.add(new HBox(6, heightField, unitHeight), 1, 0);
         grid.add(timeCheck, 0, 1);
-        grid.add(new HBox(6, timeField, new Label("s")), 1, 1);
+        grid.add(new HBox(6, timeField, unitTime), 1, 1);
         grid.add(rangeCheck, 0, 2);
-        grid.add(new HBox(6, rangeField, new Label("m")), 1, 2);
+        grid.add(new HBox(6, rangeField, unitRange), 1, 2);
 
         lockButton.setId("lockPredictionsButton");
         lockButton.getStyleClass().add("transport-primary");
@@ -159,7 +198,7 @@ final class PredictionView extends BorderPane {
         evaluateButton.setDisable(true);
 
         statusLabel.setId("predictionStatusLabel");
-        statusLabel.setStyle("-fx-font-family: Consolas; -fx-font-size: 10.5px; -fx-text-fill: #142e4b;");
+        statusLabel.setStyle("-fx-font-family: Consolas; -fx-font-size: 10.5px; -fx-text-fill: #000000;");
 
         invalidWarningLabel.setId("predictionInvalidWarning");
         invalidWarningLabel.setStyle("-fx-font-family: Consolas; -fx-font-size: 10px; -fx-font-weight: bold; -fx-text-fill: #b45309; -fx-background-color: #fef9ee; -fx-padding: 6 8 6 8; -fx-border-color: #b45309; -fx-border-width: 1;");
@@ -192,15 +231,21 @@ final class PredictionView extends BorderPane {
 
         updateParamsLabel();
         heightField.setDisable(false);
+        heightField.setOpacity(1.0);
         heightField.clear();
         timeField.setDisable(false);
+        timeField.setOpacity(1.0);
         timeField.clear();
         rangeField.setDisable(false);
+        rangeField.setOpacity(1.0);
         rangeField.clear();
 
         heightCheck.setDisable(false);
+        heightCheck.setOpacity(1.0);
         timeCheck.setDisable(false);
+        timeCheck.setOpacity(1.0);
         rangeCheck.setDisable(false);
+        rangeCheck.setOpacity(1.0);
 
         lockButton.setDisable(false);
         evaluateButton.setDisable(true);
@@ -241,11 +286,17 @@ final class PredictionView extends BorderPane {
             challenge.lock();
 
             heightField.setDisable(true);
+            heightField.setOpacity(1.0);
             timeField.setDisable(true);
+            timeField.setOpacity(1.0);
             rangeField.setDisable(true);
+            rangeField.setOpacity(1.0);
             heightCheck.setDisable(true);
+            heightCheck.setOpacity(1.0);
             timeCheck.setDisable(true);
+            timeCheck.setOpacity(1.0);
             rangeCheck.setDisable(true);
+            rangeCheck.setOpacity(1.0);
 
             lockButton.setDisable(true);
             boolean readyForEvaluation = isExperimentComplete();

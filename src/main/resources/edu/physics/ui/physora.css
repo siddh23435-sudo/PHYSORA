@@ -525,3 +525,82 @@
     -fx-border-color: #cbd5e1;
     -fx-border-radius: 3px;
 }
+
+/* =========================================================================
+   Prediction Inputs Card - Explicit Black Typography & High Contrast
+   Ensures prediction labels, checkboxes, values, and units remain crisp black
+   and completely readable in both active and locked/disabled states.
+   ========================================================================= */
+
+#predictionInputCard {
+    -fx-disabled-opacity: 1.0;
+}
+
+#predictionInputCard :disabled {
+    -fx-opacity: 1.0;
+}
+
+#predictionInputCard .prediction-checkbox,
+#predictionInputCard .prediction-checkbox:disabled,
+#predictionInputCard .check-box,
+#predictionInputCard .check-box:disabled {
+    -fx-opacity: 1.0;
+    -fx-text-fill: #000000;
+    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+#predictionInputCard .prediction-checkbox .text,
+#predictionInputCard .prediction-checkbox:disabled .text,
+#predictionInputCard .check-box .text,
+#predictionInputCard .check-box:disabled .text {
+    -fx-opacity: 1.0;
+    -fx-fill: #000000;
+    -fx-font-weight: bold;
+}
+
+#predictionInputCard .check-box > .box,
+#predictionInputCard .check-box:disabled > .box {
+    -fx-opacity: 1.0;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #000000;
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 2px;
+    -fx-background-radius: 2px;
+}
+
+#predictionInputCard .check-box:selected > .box > .mark,
+#predictionInputCard .check-box:disabled:selected > .box > .mark {
+    -fx-opacity: 1.0;
+    -fx-background-color: #000000;
+}
+
+#predictionInputCard .prediction-field,
+#predictionInputCard .prediction-field:disabled,
+#predictionInputCard .text-field,
+#predictionInputCard .text-field:disabled {
+    -fx-opacity: 1.0;
+    -fx-text-fill: #000000;
+    -fx-font-family: "Consolas", monospace;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #000000;
+    -fx-border-width: 1.2px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+
+#predictionInputCard .prediction-unit-label,
+#predictionInputCard .prediction-unit-label:disabled,
+#predictionInputCard .label,
+#predictionInputCard .label:disabled {
+    -fx-opacity: 1.0;
+    -fx-text-fill: #000000;
+}
+
+#predictionInputCard .transport-secondary:disabled {
+    -fx-opacity: 0.8;
+    -fx-text-fill: #334155;
+}
